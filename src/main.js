@@ -6,6 +6,11 @@ import started from "electron-squirrel-startup";
 import { loadProject } from "./main/services/ProjectLoader.js";
 import { buildFileTree, readFile, writeFile, fileExists } from "./main/services/FileSystemService.js";
 import { createPreviewService, checkMkDocsAvailability } from "./main/services/MkDocsPreviewService.js";
+import {
+  createPythonEnvironmentService,
+  checkPythonAvailability,
+  detectProjectEnvironment,
+} from "./main/services/PythonEnvironmentService.js";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -16,6 +21,7 @@ if (started) {
 let mainWindow = null;
 let currentProject = null;
 let previewService = null;
+let pythonEnvService = null;
 
 /**
  * Gets the docs directory path for the current project
@@ -134,6 +140,54 @@ function setupIpcHandlers() {
     return checkMkDocsAvailability();
   });
 
+  // Python environment handlers
+  ipcMain.handle("pythonEnv:checkPython", () => {
+    return checkPythonAvailability();
+  });
+
+  ipcMain.handle("pythonEnv:detectProjectEnv", async (_event, projectPath) => {
+    const targetPath = projectPath || (currentProject ? currentProject.projectRoot : null);
+    if (!targetPath) {
+      throw new Error("No project path provided and no project loaded");
+    }
+    return detectProjectEnvironment(targetPath);
+  });
+
+  ipcMain.handle("pythonEnv:getStatus", () => {
+    if (!pythonEnvService) {
+      return {
+        status: "not-initialized",
+        pythonPath: null,
+        mkdocsPath: null,
+        venvPath: null,
+        error: null,
+        envType: null,
+      };
+    }
+    return pythonEnvService.getState();
+  });
+
+  ipcMain.handle("pythonEnv:ensure", async () => {
+    if (!pythonEnvService) {
+      throw new Error("No project loaded");
+    }
+    return pythonEnvService.ensureEnvironment();
+  });
+
+  ipcMain.handle("pythonEnv:reinstall", async () => {
+    if (!pythonEnvService) {
+      throw new Error("No project loaded");
+    }
+    return pythonEnvService.reinstall();
+  });
+
+  ipcMain.handle("pythonEnv:getLogs", () => {
+    if (!pythonEnvService) {
+      return [];
+    }
+    return pythonEnvService.getLogs();
+  });
+
   // App handlers
   ipcMain.handle("app:getVersion", () => {
     return app.getVersion();
@@ -151,8 +205,24 @@ async function handleProjectLoad(projectPath) {
   // Load the new project
   currentProject = await loadProject(projectPath);
 
+  // Create Python environment service
+  pythonEnvService = createPythonEnvironmentService(currentProject.projectRoot);
+
+  // Forward Python env events to renderer
+  pythonEnvService.on("status", (status) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("pythonEnv:status", status);
+    }
+  });
+
+  pythonEnvService.on("log", (log) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("pythonEnv:log", log);
+    }
+  });
+
   // Create preview service
-  previewService = createPreviewService(currentProject.projectRoot);
+  previewService = createPreviewService(currentProject.projectRoot, pythonEnvService);
 
   // Forward preview events to renderer
   previewService.on("status", (status) => {
@@ -181,6 +251,10 @@ async function handleProjectClose() {
     await previewService.stop();
     previewService.removeAllListeners();
     previewService = null;
+  }
+  if (pythonEnvService) {
+    pythonEnvService.removeAllListeners();
+    pythonEnvService = null;
   }
   currentProject = null;
 }

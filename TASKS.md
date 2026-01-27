@@ -44,7 +44,7 @@
 
 ## Phase 3 — Preview/runtime integration (P0)
 
-- T11 Implement MkDocs runtime strategy (main process)
+- [x] T11 Implement MkDocs runtime strategy (main process)
   - Strategy A (P0): Use system Python + create project-local venv on first run
   - Commands:
     - python -m venv .materialdocs-venv

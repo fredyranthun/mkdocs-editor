@@ -51,6 +51,35 @@ export interface PreviewState {
   error: string | null;
 }
 
+export type PythonEnvStatus = "not-initialized" | "checking" | "ready" | "creating" | "installing" | "error";
+
+export type PythonEnvType = "system" | "project-venv" | "app-venv" | null;
+
+export interface PythonEnvState {
+  status: PythonEnvStatus;
+  pythonPath: string | null;
+  mkdocsPath: string | null;
+  venvPath: string | null;
+  error: string | null;
+  envType: PythonEnvType;
+}
+
+export interface PythonInfo {
+  available: boolean;
+  path?: string;
+  version?: string;
+  error?: string;
+}
+
+export interface ProjectEnvInfo {
+  hasRequirements: boolean;
+  hasPoetry: boolean;
+  hasPipenv: boolean;
+  hasVenv: boolean;
+  hasAppVenv: boolean;
+  existingVenvPath: string | null;
+}
+
 export interface PreloadAPI {
   project: {
     /**
@@ -127,6 +156,55 @@ export interface PreloadAPI {
      * @returns Unsubscribe function
      */
     onStatus(callback: (status: PreviewState) => void): () => void;
+
+    /**
+     * Subscribes to log messages
+     * @returns Unsubscribe function
+     */
+    onLog(callback: (log: string) => void): () => void;
+
+    /**
+     * Checks if MkDocs is installed and available
+     */
+    checkMkDocs(): Promise<{ available: boolean; path?: string; version?: string; error?: string }>;
+  };
+
+  pythonEnv: {
+    /**
+     * Checks if Python is available on the system
+     */
+    checkPython(): Promise<PythonInfo>;
+
+    /**
+     * Detects existing Python environments in a project
+     */
+    detectProjectEnv(projectPath?: string): Promise<ProjectEnvInfo>;
+
+    /**
+     * Gets current Python environment status
+     */
+    getStatus(): Promise<PythonEnvState>;
+
+    /**
+     * Ensures Python environment is ready (creates venv and installs mkdocs if needed)
+     */
+    ensure(): Promise<PythonEnvState>;
+
+    /**
+     * Reinstalls MkDocs in the app venv (for fixing corrupted installs)
+     */
+    reinstall(): Promise<PythonEnvState>;
+
+    /**
+     * Gets Python environment logs
+     */
+    getLogs(): Promise<string[]>;
+
+    /**
+     * Subscribes to status changes
+     * @returns Unsubscribe function
+     */
+    onStatus(callback: (status: PythonEnvState) => void): () => void;
 
     /**
      * Subscribes to log messages

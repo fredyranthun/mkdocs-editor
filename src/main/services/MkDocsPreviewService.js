@@ -187,10 +187,12 @@ export async function waitForServer(url, maxWait = 30000, interval = 500) {
 export class PreviewService extends EventEmitter {
   /**
    * @param {string} projectRoot - Absolute path to project root
+   * @param {import('./PythonEnvironmentService.js').PythonEnvironmentService} [pythonEnvService] - Optional Python environment service
    */
-  constructor(projectRoot) {
+  constructor(projectRoot, pythonEnvService = null) {
     super();
     this.projectRoot = projectRoot;
+    this.pythonEnvService = pythonEnvService;
     this.process = null;
     this.state = {
       status: "stopped",
@@ -252,20 +254,47 @@ export class PreviewService extends EventEmitter {
     this._updateState({ status: "starting", error: null });
     this._addLog("Starting preview server...");
 
-    // Check if mkdocs is available first
-    const mkdocsCheck = checkMkDocsAvailability();
-    if (!mkdocsCheck.available) {
-      this._addLog(`MkDocs not found: ${mkdocsCheck.error}`);
-      this._updateState({
-        status: "error",
-        url: null,
-        port: null,
-        error: mkdocsCheck.error,
-      });
-      return this.getState();
+    // Determine mkdocs command and environment
+    let mkdocsCommand = "mkdocs";
+    let envVars = { ...process.env, PATH: getEnhancedPath() };
+
+    // If Python environment service is available, try to use it
+    if (this.pythonEnvService) {
+      const envState = this.pythonEnvService.getState();
+      if (envState.status === "ready" && envState.mkdocsPath) {
+        this._addLog(`Using mkdocs from Python environment: ${envState.mkdocsPath}`);
+        mkdocsCommand = `"${envState.mkdocsPath}"`;
+        envVars = { ...process.env, ...this.pythonEnvService.getEnvVars() };
+      } else if (envState.status === "not-initialized") {
+        // Environment not initialized, try to ensure it first
+        this._addLog("Python environment not initialized, attempting to set up...");
+        const ensuredState = await this.pythonEnvService.ensureEnvironment();
+        if (ensuredState.status === "ready" && ensuredState.mkdocsPath) {
+          this._addLog(`Python environment ready, using mkdocs: ${ensuredState.mkdocsPath}`);
+          mkdocsCommand = `"${ensuredState.mkdocsPath}"`;
+          envVars = { ...process.env, ...this.pythonEnvService.getEnvVars() };
+        } else if (ensuredState.status === "error") {
+          this._addLog(`Python environment setup failed: ${ensuredState.error}`);
+          // Fall back to system mkdocs
+        }
+      }
     }
 
-    this._addLog(`Found MkDocs: ${mkdocsCheck.version} at ${mkdocsCheck.path}`);
+    // Check if mkdocs is available (either from env service or system)
+    if (mkdocsCommand === "mkdocs") {
+      const mkdocsCheck = checkMkDocsAvailability();
+      if (!mkdocsCheck.available) {
+        this._addLog(`MkDocs not found: ${mkdocsCheck.error}`);
+        this._updateState({
+          status: "error",
+          url: null,
+          port: null,
+          error: mkdocsCheck.error,
+        });
+        return this.getState();
+      }
+      this._addLog(`Found system MkDocs: ${mkdocsCheck.version} at ${mkdocsCheck.path}`);
+    }
 
     try {
       // Find available port
@@ -274,7 +303,7 @@ export class PreviewService extends EventEmitter {
 
       // Spawn mkdocs serve with livereload enabled
       const devAddr = `127.0.0.1:${port}`;
-      const command = `mkdocs serve --dev-addr ${devAddr} --livereload`;
+      const command = `${mkdocsCommand} serve --dev-addr ${devAddr} --livereload`;
 
       this._addLog(`Running: ${command}`);
 
@@ -285,10 +314,7 @@ export class PreviewService extends EventEmitter {
         stdio: ["ignore", "pipe", "pipe"],
         shell: true,
         detached: true, // Create new process group for proper cleanup
-        env: {
-          ...process.env,
-          PATH: getEnhancedPath(),
-        },
+        env: envVars,
       });
 
       // Handle stdout
@@ -427,10 +453,11 @@ export class PreviewService extends EventEmitter {
 /**
  * Creates a new preview service for a project
  * @param {string} projectRoot
+ * @param {import('./PythonEnvironmentService.js').PythonEnvironmentService} [pythonEnvService] - Optional Python environment service
  * @returns {PreviewService}
  */
-export function createPreviewService(projectRoot) {
-  return new PreviewService(projectRoot);
+export function createPreviewService(projectRoot, pythonEnvService = null) {
+  return new PreviewService(projectRoot, pythonEnvService);
 }
 
 export default {
