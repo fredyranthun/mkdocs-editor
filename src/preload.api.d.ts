@@ -1,0 +1,152 @@
+/**
+ * Type definitions for the Preload API exposed to renderer
+ *
+ * This file provides TypeScript definitions for window.api
+ * Use in renderer with: declare const api: typeof import('./preload.api').api
+ */
+
+export interface MkDocsConfig {
+  siteName: string;
+  docsDir: string;
+  siteDir: string;
+  nav: Array<unknown> | null;
+  markdownExtensions: string[];
+  theme: {
+    name: string;
+    [key: string]: unknown;
+  };
+  raw: Record<string, unknown>;
+}
+
+export interface ProjectInfo {
+  projectRoot: string;
+  config: MkDocsConfig;
+}
+
+export interface FileNode {
+  name: string;
+  path: string;
+  absolutePath: string;
+  type: "file" | "directory";
+  children?: FileNode[];
+}
+
+export interface FileContent {
+  path: string;
+  content: string;
+  mtime: number;
+}
+
+export interface WriteResult {
+  path: string;
+  mtime: number;
+}
+
+export type PreviewStatus = "stopped" | "starting" | "running" | "error";
+
+export interface PreviewState {
+  status: PreviewStatus;
+  url: string | null;
+  port: number | null;
+  error: string | null;
+}
+
+export interface PreloadAPI {
+  project: {
+    /**
+     * Opens a folder selection dialog and loads the project
+     */
+    open(): Promise<ProjectInfo | null>;
+
+    /**
+     * Loads a project from a specific path
+     */
+    load(projectPath: string): Promise<ProjectInfo>;
+
+    /**
+     * Gets the file tree for the current project
+     */
+    getTree(): Promise<FileNode[]>;
+
+    /**
+     * Gets current project info
+     */
+    getCurrent(): Promise<ProjectInfo | null>;
+
+    /**
+     * Closes the current project
+     */
+    close(): Promise<void>;
+  };
+
+  page: {
+    /**
+     * Reads a markdown file
+     */
+    read(relativePath: string): Promise<FileContent>;
+
+    /**
+     * Writes content to a markdown file
+     */
+    write(relativePath: string, content: string): Promise<WriteResult>;
+
+    /**
+     * Checks if a file exists
+     */
+    exists(relativePath: string): Promise<boolean>;
+  };
+
+  preview: {
+    /**
+     * Starts the preview server
+     */
+    start(): Promise<PreviewState>;
+
+    /**
+     * Stops the preview server
+     */
+    stop(): Promise<PreviewState>;
+
+    /**
+     * Restarts the preview server
+     */
+    restart(): Promise<PreviewState>;
+
+    /**
+     * Gets current preview status
+     */
+    getStatus(): Promise<PreviewState>;
+
+    /**
+     * Gets preview logs
+     */
+    getLogs(): Promise<string[]>;
+
+    /**
+     * Subscribes to status changes
+     * @returns Unsubscribe function
+     */
+    onStatus(callback: (status: PreviewState) => void): () => void;
+
+    /**
+     * Subscribes to log messages
+     * @returns Unsubscribe function
+     */
+    onLog(callback: (log: string) => void): () => void;
+  };
+
+  app: {
+    /**
+     * Gets app version
+     */
+    getVersion(): Promise<string>;
+  };
+}
+
+declare global {
+  interface Window {
+    api: PreloadAPI;
+  }
+}
+
+export {};

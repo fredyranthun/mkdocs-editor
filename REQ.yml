@@ -1,0 +1,153 @@
+product: MaterialDocs Editor
+version: 0.1.0
+requirements:
+
+  - id: FR-001
+    title: "Open MkDocs project"
+    description: User selects a folder containing mkdocs.yml; app loads configuration and docs directory.
+    acceptance:
+      - Detects mkdocs.yml in selected folder root; otherwise shows actionable error.
+      - Parses docs_dir; defaults to "docs" if not set.
+      - Lists markdown pages under docs_dir.
+    priority: P0
+
+  - id: FR-002
+    title: "Page tree navigation"
+    description: Show left sidebar with page tree; open on click.
+    acceptance:
+      - Shows hierarchical view based on filesystem folders.
+      - Supports creating new page, renaming page, deleting page, moving page via drag/drop.
+      - Prevents invalid filenames; shows friendly validation messages.
+    priority: P0
+
+  - id: FR-003
+    title: "WYSIWYG editor basic blocks"
+    description: Edit markdown content via visual blocks.
+    acceptance:
+      - Supports headings (H1-H6), paragraphs, bold, italic, links, bulleted/numbered lists.
+      - Supports tables (simple grid editor ok).
+      - Has undo/redo.
+      - A "View Markdown" read-only toggle exists (hidden under an advanced menu).
+    priority: P0
+
+  - id: FR-004
+    title: "Save Markdown output"
+    description: Serialize WYSIWYG document to Markdown and write to disk.
+    acceptance:
+      - Saved content is valid UTF-8 markdown in the original file path.
+      - App preserves newline normalization consistently (LF) OR provides a configurable option.
+      - Autosave optional; if present must be toggleable.
+    priority: P0
+
+  - id: FR-005
+    title: "Live preview using mkdocs serve"
+    description: Start mkdocs serve for opened project and embed preview in app.
+    acceptance:
+      - App starts mkdocs serve on localhost with an available port.
+      - Preview updates automatically on file save.
+      - If mkdocs serve fails, show readable error and logs.
+      - Stop server when project closes or app exits.
+    priority: P0
+
+  - id: FR-006
+    title: "Material feature: Admonitions"
+    description: Insert/edit admonition blocks compatible with Material/pymdown.
+    acceptance:
+      - UI provides "Callout" insertion with type dropdown (note, info, warning, tip, danger).
+      - Serializes to Markdown "!!!" syntax with correct indentation.
+      - If required extension not enabled, feature is disabled and explanation shown.
+    priority: P0
+
+  - id: FR-007
+    title: "Material feature: Mermaid diagrams"
+    description: Insert/edit mermaid fenced blocks with live in-editor preview.
+    acceptance:
+      - UI provides "Diagram (Mermaid)" insertion and an editor textbox.
+      - Serializes to fenced code block ```mermaid ...```.
+      - If diagram support not configured, show instructions or disable depending on policy.
+    priority: P0
+
+  - id: FR-008
+    title: "Code blocks"
+    description: Insert/edit fenced code blocks with language selection.
+    acceptance:
+      - Language dropdown + monospaced editor.
+      - Serializes to fenced blocks with chosen language.
+    priority: P0
+
+  - id: FR-009
+    title: "Asset management for images"
+    description: Add images from local disk; copy into project and insert link.
+    acceptance:
+      - Copies file into docs_dir/assets (or configurable assets dir).
+      - Inserts correct relative markdown link.
+      - Supports drag-drop image insertion into editor.
+    priority: P1
+
+  - id: FR-010
+    title: "Extension-aware toolbar"
+    description: Enable/disable features based on mkdocs.yml markdown_extensions.
+    acceptance:
+      - Reads mkdocs.yml and determines availability for admonitions/diagrams/tabs as configured.
+      - Disabled features show tooltip + "How to enable" guidance.
+    priority: P1
+
+  - id: FR-011
+    title: "Milkdown-based editor integration"
+    description: Use Milkdown as the WYSIWYG markdown editor in the React UI.
+    acceptance:
+      - Editor loads markdown content from disk and renders in WYSIWYG.
+      - Editor exports deterministic markdown on save.
+      - Toolbar supports basic formatting (headings, bold/italic, lists, links).
+    priority: P0
+
+  - id: FR-012
+    title: "Lossless mode for unsupported syntax"
+    description: Preserve MkDocs/Material syntax not supported by the WYSIWYG without data loss.
+    acceptance:
+      - When importing markdown, any unsupported region is stored as a RawBlock.
+      - On export, RawBlock content is emitted unchanged in the original position.
+      - RawBlocks are editable via a simple inline "Edit source" modal.
+    priority: P0
+
+  - id: FR-013
+    title: "Deterministic markdown serializer"
+    description: Export markdown in a consistent style to avoid noisy diffs.
+    acceptance:
+      - Normalizes line endings (LF).
+      - Uses consistent spacing/indentation for admonitions and lists.
+      - Ensures fenced blocks remain fenced and unmodified except the edited content.
+    priority: P0
+
+
+  - id: NFR-001
+    title: "Local-first & privacy"
+    description: All editing happens locally; no telemetry by default.
+    acceptance:
+      - No network calls except localhost preview.
+      - A single config toggle enables telemetry if ever added (default off).
+    priority: P0
+
+  - id: NFR-002
+    title: "Reliability of preview"
+    description: Preview must match mkdocs build output as closely as possible.
+    acceptance:
+      - Uses mkdocs serve from the project environment or a bundled runtime.
+      - Logs include command invoked, working directory, and captured stdout/stderr.
+    priority: P0
+  - id: NFR-003
+    title: "Cross-platform packaging (macOS + Linux)"
+    description: "Distributable app packages for macOS and Linux."
+    acceptance:
+      - Produces installable artifacts for macOS and Linux in CI (or documented local build steps).
+      - Version and build metadata are visible in the app (About dialog).
+    priority: P1
+
+  - id: NFR-004
+    title: "Electron security defaults"
+    description: "Renderer runs without Node privileges; privileged operations are isolated."
+    acceptance:
+      - BrowserWindow uses contextIsolation=true and nodeIntegration=false.
+      - All filesystem/process access is performed in the main process and exposed via a narrow preload API (contextBridge).
+      - Preview panel blocks navigation away from localhost preview URL.
+    priority: P0
