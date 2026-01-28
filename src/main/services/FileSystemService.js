@@ -165,6 +165,222 @@ export async function fileExists(docsRoot, relativePath) {
 }
 
 /**
+ * Validates path security (ensures path is within docs root)
+ * @param {string} docsRoot - Absolute path to docs directory
+ * @param {string} relativePath - Path relative to docs root
+ * @returns {{resolvedPath: string, resolvedRoot: string}}
+ * @throws {Error} If path is outside docs root
+ */
+function validatePathSecurity(docsRoot, relativePath) {
+  const absolutePath = path.join(docsRoot, relativePath);
+  const resolvedPath = path.resolve(absolutePath);
+  const resolvedRoot = path.resolve(docsRoot);
+
+  if (!resolvedPath.startsWith(resolvedRoot + path.sep) && resolvedPath !== resolvedRoot) {
+    throw new Error("Access denied: path outside docs directory");
+  }
+
+  return { resolvedPath, resolvedRoot };
+}
+
+/**
+ * Creates a new markdown file
+ * @param {string} docsRoot - Absolute path to docs directory
+ * @param {string} relativePath - Path relative to docs root
+ * @param {string} [content=''] - Initial content
+ * @returns {Promise<{path: string, mtime: number}>}
+ * @throws {Error} If file already exists or path is invalid
+ */
+export async function createFile(docsRoot, relativePath, content = "") {
+  validatePathSecurity(docsRoot, relativePath);
+
+  // Verify it's a markdown file
+  if (!relativePath.endsWith(".md")) {
+    throw new Error("Only markdown files can be created");
+  }
+
+  const absolutePath = path.join(docsRoot, relativePath);
+
+  // Check if file already exists
+  try {
+    await fs.promises.access(absolutePath, fs.constants.F_OK);
+    throw new Error("File already exists");
+  } catch (err) {
+    if (err.message === "File already exists") throw err;
+    // File doesn't exist, continue
+  }
+
+  // Ensure parent directory exists
+  const parentDir = path.dirname(absolutePath);
+  await fs.promises.mkdir(parentDir, { recursive: true });
+
+  await fs.promises.writeFile(absolutePath, content, "utf-8");
+
+  const stat = await fs.promises.stat(absolutePath);
+  return {
+    path: relativePath,
+    mtime: stat.mtimeMs,
+  };
+}
+
+/**
+ * Deletes a markdown file
+ * @param {string} docsRoot - Absolute path to docs directory
+ * @param {string} relativePath - Path relative to docs root
+ * @returns {Promise<{path: string, deleted: boolean}>}
+ * @throws {Error} If path is outside docs root
+ */
+export async function deleteFile(docsRoot, relativePath) {
+  validatePathSecurity(docsRoot, relativePath);
+
+  // Verify it's a markdown file
+  if (!relativePath.endsWith(".md")) {
+    throw new Error("Only markdown files can be deleted");
+  }
+
+  const absolutePath = path.join(docsRoot, relativePath);
+
+  await fs.promises.unlink(absolutePath);
+
+  return {
+    path: relativePath,
+    deleted: true,
+  };
+}
+
+/**
+ * Renames/moves a markdown file
+ * @param {string} docsRoot - Absolute path to docs directory
+ * @param {string} oldRelativePath - Current path relative to docs root
+ * @param {string} newRelativePath - New path relative to docs root
+ * @returns {Promise<{oldPath: string, newPath: string, mtime: number}>}
+ * @throws {Error} If paths are invalid or destination exists
+ */
+export async function renameFile(docsRoot, oldRelativePath, newRelativePath) {
+  validatePathSecurity(docsRoot, oldRelativePath);
+  validatePathSecurity(docsRoot, newRelativePath);
+
+  // Verify both are markdown files
+  if (!oldRelativePath.endsWith(".md") || !newRelativePath.endsWith(".md")) {
+    throw new Error("Only markdown files can be renamed");
+  }
+
+  const oldAbsolutePath = path.join(docsRoot, oldRelativePath);
+  const newAbsolutePath = path.join(docsRoot, newRelativePath);
+
+  // Check source exists
+  await fs.promises.access(oldAbsolutePath, fs.constants.F_OK);
+
+  // Check destination doesn't exist
+  try {
+    await fs.promises.access(newAbsolutePath, fs.constants.F_OK);
+    throw new Error("Destination file already exists");
+  } catch (err) {
+    if (err.message === "Destination file already exists") throw err;
+    // File doesn't exist, continue
+  }
+
+  // Ensure parent directory exists for destination
+  const parentDir = path.dirname(newAbsolutePath);
+  await fs.promises.mkdir(parentDir, { recursive: true });
+
+  await fs.promises.rename(oldAbsolutePath, newAbsolutePath);
+
+  const stat = await fs.promises.stat(newAbsolutePath);
+  return {
+    oldPath: oldRelativePath,
+    newPath: newRelativePath,
+    mtime: stat.mtimeMs,
+  };
+}
+
+/**
+ * Creates a new directory
+ * @param {string} docsRoot - Absolute path to docs directory
+ * @param {string} relativePath - Path relative to docs root
+ * @returns {Promise<{path: string, created: boolean}>}
+ */
+export async function createDirectory(docsRoot, relativePath) {
+  validatePathSecurity(docsRoot, relativePath);
+
+  const absolutePath = path.join(docsRoot, relativePath);
+
+  await fs.promises.mkdir(absolutePath, { recursive: true });
+
+  return {
+    path: relativePath,
+    created: true,
+  };
+}
+
+/**
+ * Deletes an empty directory
+ * @param {string} docsRoot - Absolute path to docs directory
+ * @param {string} relativePath - Path relative to docs root
+ * @returns {Promise<{path: string, deleted: boolean}>}
+ * @throws {Error} If directory is not empty
+ */
+export async function deleteDirectory(docsRoot, relativePath) {
+  validatePathSecurity(docsRoot, relativePath);
+
+  const absolutePath = path.join(docsRoot, relativePath);
+
+  // Check if directory is empty
+  const entries = await fs.promises.readdir(absolutePath);
+  if (entries.length > 0) {
+    throw new Error("Directory is not empty");
+  }
+
+  await fs.promises.rmdir(absolutePath);
+
+  return {
+    path: relativePath,
+    deleted: true,
+  };
+}
+
+/**
+ * Renames/moves a directory
+ * @param {string} docsRoot - Absolute path to docs directory
+ * @param {string} oldRelativePath - Current path relative to docs root
+ * @param {string} newRelativePath - New path relative to docs root
+ * @returns {Promise<{oldPath: string, newPath: string}>}
+ */
+export async function renameDirectory(docsRoot, oldRelativePath, newRelativePath) {
+  validatePathSecurity(docsRoot, oldRelativePath);
+  validatePathSecurity(docsRoot, newRelativePath);
+
+  const oldAbsolutePath = path.join(docsRoot, oldRelativePath);
+  const newAbsolutePath = path.join(docsRoot, newRelativePath);
+
+  // Check source exists and is a directory
+  const stat = await fs.promises.stat(oldAbsolutePath);
+  if (!stat.isDirectory()) {
+    throw new Error("Source is not a directory");
+  }
+
+  // Check destination doesn't exist
+  try {
+    await fs.promises.access(newAbsolutePath, fs.constants.F_OK);
+    throw new Error("Destination already exists");
+  } catch (err) {
+    if (err.message === "Destination already exists") throw err;
+    // Path doesn't exist, continue
+  }
+
+  // Ensure parent directory exists for destination
+  const parentDir = path.dirname(newAbsolutePath);
+  await fs.promises.mkdir(parentDir, { recursive: true });
+
+  await fs.promises.rename(oldAbsolutePath, newAbsolutePath);
+
+  return {
+    oldPath: oldRelativePath,
+    newPath: newRelativePath,
+  };
+}
+
+/**
  * Flattens file tree into a list of files (for search/iteration)
  * @param {FileNode[]} tree - File tree from buildFileTree
  * @returns {FileNode[]} Flat list of file nodes only
@@ -186,10 +402,204 @@ export function flattenTree(tree) {
   return files;
 }
 
+// =============================================================================
+// Asset Management
+// =============================================================================
+
+/**
+ * Supported image file extensions
+ */
+const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico", ".bmp"];
+
+/**
+ * Checks if a file is an image based on extension
+ * @param {string} filename - File name or path
+ * @returns {boolean}
+ */
+export function isImageFile(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  return IMAGE_EXTENSIONS.includes(ext);
+}
+
+/**
+ * Gets the default assets directory path
+ * @returns {string}
+ */
+export function getAssetsDir() {
+  return "assets";
+}
+
+/**
+ * Generates a unique filename if a file already exists
+ * @param {string} docsRoot - Absolute path to docs directory
+ * @param {string} relativePath - Relative path to check
+ * @returns {Promise<string>} Unique relative path
+ */
+async function generateUniqueFilename(docsRoot, relativePath) {
+  const ext = path.extname(relativePath);
+  const baseName = path.basename(relativePath, ext);
+  const dirPath = path.dirname(relativePath);
+
+  let counter = 0;
+  let uniquePath = relativePath;
+
+  while (await fileExists(docsRoot, uniquePath)) {
+    counter++;
+    const newName = `${baseName}-${counter}${ext}`;
+    uniquePath = path.join(dirPath, newName);
+  }
+
+  return uniquePath;
+}
+
+/**
+ * Copies an asset (image) to the docs/assets directory
+ * @param {string} docsRoot - Absolute path to docs directory
+ * @param {string} sourcePath - Absolute path to source file
+ * @param {string} [targetSubdir='assets'] - Target subdirectory in docs
+ * @returns {Promise<{relativePath: string, absolutePath: string, filename: string}>}
+ */
+export async function copyAsset(docsRoot, sourcePath, targetSubdir = "assets") {
+  // Validate source file exists
+  try {
+    await fs.promises.access(sourcePath, fs.constants.F_OK);
+  } catch {
+    throw new Error(`Source file does not exist: ${sourcePath}`);
+  }
+
+  // Validate it's an image file
+  const filename = path.basename(sourcePath);
+  if (!isImageFile(filename)) {
+    throw new Error(`Not a supported image file: ${filename}`);
+  }
+
+  // Ensure target directory exists
+  const targetDir = path.join(docsRoot, targetSubdir);
+  await fs.promises.mkdir(targetDir, { recursive: true });
+
+  // Generate unique filename if needed
+  const targetRelativePath = path.join(targetSubdir, filename);
+  const uniqueRelativePath = await generateUniqueFilename(docsRoot, targetRelativePath);
+  const targetAbsolutePath = path.join(docsRoot, uniqueRelativePath);
+
+  // Copy the file
+  await fs.promises.copyFile(sourcePath, targetAbsolutePath);
+
+  return {
+    relativePath: uniqueRelativePath,
+    absolutePath: targetAbsolutePath,
+    filename: path.basename(uniqueRelativePath),
+  };
+}
+
+/**
+ * Lists assets in the assets directory
+ * @param {string} docsRoot - Absolute path to docs directory
+ * @param {string} [assetsSubdir='assets'] - Assets subdirectory
+ * @returns {Promise<Array<{name: string, path: string, absolutePath: string, size: number, mtime: number}>>}
+ */
+export async function listAssets(docsRoot, assetsSubdir = "assets") {
+  const assetsPath = path.join(docsRoot, assetsSubdir);
+
+  try {
+    await fs.promises.access(assetsPath, fs.constants.F_OK);
+  } catch {
+    // Assets directory doesn't exist yet
+    return [];
+  }
+
+  const entries = await fs.promises.readdir(assetsPath, { withFileTypes: true });
+  const assets = [];
+
+  for (const entry of entries) {
+    if (entry.isFile() && isImageFile(entry.name)) {
+      const relativePath = path.join(assetsSubdir, entry.name);
+      const absolutePath = path.join(docsRoot, relativePath);
+      const stat = await fs.promises.stat(absolutePath);
+
+      assets.push({
+        name: entry.name,
+        path: relativePath,
+        absolutePath,
+        size: stat.size,
+        mtime: stat.mtimeMs,
+      });
+    }
+  }
+
+  // Sort by name
+  assets.sort((a, b) => a.name.localeCompare(b.name));
+
+  return assets;
+}
+
+/**
+ * Deletes an asset file
+ * @param {string} docsRoot - Absolute path to docs directory
+ * @param {string} relativePath - Relative path to asset
+ * @returns {Promise<{path: string, deleted: boolean}>}
+ */
+export async function deleteAsset(docsRoot, relativePath) {
+  // Security: ensure path is within docs root
+  const absolutePath = path.join(docsRoot, relativePath);
+  const resolvedPath = path.resolve(absolutePath);
+  const resolvedRoot = path.resolve(docsRoot);
+
+  if (!resolvedPath.startsWith(resolvedRoot + path.sep) && resolvedPath !== resolvedRoot) {
+    throw new Error("Access denied: path outside docs directory");
+  }
+
+  // Verify it's an image file
+  if (!isImageFile(relativePath)) {
+    throw new Error("Only image files can be deleted via asset manager");
+  }
+
+  await fs.promises.unlink(absolutePath);
+
+  return {
+    path: relativePath,
+    deleted: true,
+  };
+}
+
+/**
+ * Generates a relative path from a source markdown file to an asset
+ * @param {string} markdownPath - Relative path to the markdown file
+ * @param {string} assetPath - Relative path to the asset
+ * @returns {string} Relative path from markdown to asset
+ */
+export function getRelativeAssetPath(markdownPath, assetPath) {
+  const mdDir = path.dirname(markdownPath);
+
+  // If markdown is at root, asset path is just the asset path
+  if (!mdDir || mdDir === ".") {
+    return assetPath;
+  }
+
+  // Calculate relative path from markdown directory to asset
+  const relativePath = path.relative(mdDir, assetPath);
+
+  // Ensure forward slashes for markdown compatibility
+  return relativePath.replace(/\\/g, "/");
+}
+
 export default {
   buildFileTree,
   readFile,
   writeFile,
   fileExists,
   flattenTree,
+  createFile,
+  deleteFile,
+  renameFile,
+  createDirectory,
+  deleteDirectory,
+  renameDirectory,
+  // Asset management
+  isImageFile,
+  getAssetsDir,
+  copyAsset,
+  listAssets,
+  deleteAsset,
+  getRelativeAssetPath,
 };

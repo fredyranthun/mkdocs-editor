@@ -504,3 +504,186 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--bg-hover);
 }
+
+/* ==================== Context Menu ==================== */
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 160px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.context-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.context-menu-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.context-menu-item:focus {
+  outline: none;
+  background-color: var(--bg-hover);
+}
+
+.context-menu-item--danger:hover {
+  background-color: rgba(241, 76, 76, 0.2);
+  color: var(--error-color);
+}
+
+.context-menu-icon {
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+}
+
+.context-menu-separator {
+  height: 1px;
+  margin: 4px 8px;
+  background-color: var(--border-color);
+}
+
+/* ==================== Dialog Styles ==================== */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 400px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  padding: 20px;
+}
+
+.dialog-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+}
+
+.dialog-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+}
+
+.dialog-field {
+  margin-bottom: 16px;
+}
+
+.dialog-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.dialog-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.dialog-input:focus {
+  border-color: var(--accent-color);
+}
+
+.dialog-input--error {
+  border-color: var(--error-color);
+}
+
+.dialog-error {
+  display: block;
+  font-size: 12px;
+  color: var(--error-color);
+  margin-top: 6px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.dialog-button {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.dialog-button--primary {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.dialog-button--primary:hover {
+  background-color: var(--accent-hover);
+}
+
+.dialog-button--secondary {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.dialog-button--secondary:hover {
+  background-color: var(--bg-hover);
+}
+
+.dialog-button--danger {
+  background-color: var(--error-color);
+  color: white;
+}
+
+.dialog-button--danger:hover {
+  background-color: #d43838;
+}
+
+/* ==================== Sidebar Actions ==================== */
+.sidebar-actions {
+  display: flex;
+  gap: 4px;
+}

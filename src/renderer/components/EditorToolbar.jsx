@@ -151,6 +151,7 @@ export function EditorToolbar({
   onInsertAdmonition,
   onInsertMermaid,
   onInsertCodeBlock,
+  onInsertImage,
   disabled,
 }) {
   const [showGuidance, setShowGuidance] = useState(null);
@@ -251,6 +252,14 @@ export function EditorToolbar({
               />
             )}
           </ToolbarButton>
+
+          <ToolbarButton
+            icon="🖼️"
+            label="Image"
+            disabled={disabled}
+            title="Insert image (copies to assets folder)"
+            onClick={onInsertImage}
+          />
         </div>
 
         {hasProject && (features.admonitions === false || features.mermaid === false) && (

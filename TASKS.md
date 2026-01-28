@@ -64,8 +64,8 @@
 
 ## Phase 4 — UX polish (P1)
 
-- T14 Page CRUD: new/rename/delete/move
-- T15 Asset manager: insert image → copy to docs/assets → insert relative link
+- [x] T14 Page CRUD: new/rename/delete/move
+- [x] T15 Asset manager: insert image → copy to docs/assets → insert relative link
 - T16 Advanced menu: "View Markdown" read-only + "Edit RawBlock"
 - T17 Security hardening
   - Validate/whitelist IPC channels

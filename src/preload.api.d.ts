@@ -42,6 +42,57 @@ export interface WriteResult {
   mtime: number;
 }
 
+export interface CreateResult {
+  path: string;
+  mtime: number;
+}
+
+export interface DeleteResult {
+  path: string;
+  deleted: boolean;
+}
+
+export interface RenameResult {
+  oldPath: string;
+  newPath: string;
+  mtime: number;
+}
+
+export interface DirectoryCreateResult {
+  path: string;
+  created: boolean;
+}
+
+export interface DirectoryDeleteResult {
+  path: string;
+  deleted: boolean;
+}
+
+export interface DirectoryRenameResult {
+  oldPath: string;
+  newPath: string;
+}
+
+export interface AssetInfo {
+  name: string;
+  path: string;
+  absolutePath: string;
+  size: number;
+  mtime: number;
+}
+
+export interface AssetCopyResult {
+  relativePath: string;
+  absolutePath: string;
+  filename: string;
+  markdownPath: string;
+}
+
+export interface AssetDeleteResult {
+  path: string;
+  deleted: boolean;
+}
+
 export type PreviewStatus = "stopped" | "starting" | "running" | "error";
 
 export interface PreviewState {
@@ -123,6 +174,70 @@ export interface PreloadAPI {
      * Checks if a file exists
      */
     exists(relativePath: string): Promise<boolean>;
+
+    /**
+     * Creates a new markdown file
+     */
+    create(relativePath: string, content?: string): Promise<CreateResult>;
+
+    /**
+     * Deletes a markdown file
+     */
+    delete(relativePath: string): Promise<DeleteResult>;
+
+    /**
+     * Renames a markdown file
+     */
+    rename(oldPath: string, newPath: string): Promise<RenameResult>;
+
+    /**
+     * Moves a markdown file to a different location
+     */
+    move(oldPath: string, newPath: string): Promise<RenameResult>;
+  };
+
+  directory: {
+    /**
+     * Creates a new directory
+     */
+    create(relativePath: string): Promise<DirectoryCreateResult>;
+
+    /**
+     * Deletes an empty directory
+     */
+    delete(relativePath: string): Promise<DirectoryDeleteResult>;
+
+    /**
+     * Renames a directory
+     */
+    rename(oldPath: string, newPath: string): Promise<DirectoryRenameResult>;
+  };
+
+  asset: {
+    /**
+     * Opens file dialog to select an image, copies it to assets folder
+     */
+    selectAndCopy(currentFilePath?: string): Promise<AssetCopyResult | null>;
+
+    /**
+     * Copies an image file to assets folder
+     */
+    copy(sourcePath: string, currentFilePath?: string): Promise<AssetCopyResult>;
+
+    /**
+     * Lists all assets in the assets folder
+     */
+    list(): Promise<AssetInfo[]>;
+
+    /**
+     * Deletes an asset file
+     */
+    delete(relativePath: string): Promise<AssetDeleteResult>;
+
+    /**
+     * Gets relative path from a markdown file to an asset
+     */
+    getRelativePath(markdownPath: string, assetPath: string): Promise<string>;
   };
 
   preview: {

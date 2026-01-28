@@ -4,7 +4,22 @@ import started from "electron-squirrel-startup";
 
 // Services
 import { loadProject } from "./main/services/ProjectLoader.js";
-import { buildFileTree, readFile, writeFile, fileExists } from "./main/services/FileSystemService.js";
+import {
+  buildFileTree,
+  readFile,
+  writeFile,
+  fileExists,
+  createFile,
+  deleteFile,
+  renameFile,
+  createDirectory,
+  deleteDirectory,
+  renameDirectory,
+  copyAsset,
+  listAssets,
+  deleteAsset,
+  getRelativeAssetPath,
+} from "./main/services/FileSystemService.js";
 import { createPreviewService, checkMkDocsAvailability } from "./main/services/MkDocsPreviewService.js";
 import {
   createPythonEnvironmentService,
@@ -98,6 +113,138 @@ function setupIpcHandlers() {
       throw new Error("No project loaded");
     }
     return fileExists(docsPath, relativePath);
+  });
+
+  // Page CRUD handlers
+  ipcMain.handle("page:create", async (_event, relativePath, content) => {
+    const docsPath = getDocsPath();
+    if (!docsPath) {
+      throw new Error("No project loaded");
+    }
+    return createFile(docsPath, relativePath, content || "");
+  });
+
+  ipcMain.handle("page:delete", async (_event, relativePath) => {
+    const docsPath = getDocsPath();
+    if (!docsPath) {
+      throw new Error("No project loaded");
+    }
+    return deleteFile(docsPath, relativePath);
+  });
+
+  ipcMain.handle("page:rename", async (_event, oldPath, newPath) => {
+    const docsPath = getDocsPath();
+    if (!docsPath) {
+      throw new Error("No project loaded");
+    }
+    return renameFile(docsPath, oldPath, newPath);
+  });
+
+  ipcMain.handle("page:move", async (_event, oldPath, newPath) => {
+    const docsPath = getDocsPath();
+    if (!docsPath) {
+      throw new Error("No project loaded");
+    }
+    return renameFile(docsPath, oldPath, newPath);
+  });
+
+  // Directory CRUD handlers
+  ipcMain.handle("directory:create", async (_event, relativePath) => {
+    const docsPath = getDocsPath();
+    if (!docsPath) {
+      throw new Error("No project loaded");
+    }
+    return createDirectory(docsPath, relativePath);
+  });
+
+  ipcMain.handle("directory:delete", async (_event, relativePath) => {
+    const docsPath = getDocsPath();
+    if (!docsPath) {
+      throw new Error("No project loaded");
+    }
+    return deleteDirectory(docsPath, relativePath);
+  });
+
+  ipcMain.handle("directory:rename", async (_event, oldPath, newPath) => {
+    const docsPath = getDocsPath();
+    if (!docsPath) {
+      throw new Error("No project loaded");
+    }
+    return renameDirectory(docsPath, oldPath, newPath);
+  });
+
+  // Asset handlers
+  ipcMain.handle("asset:selectAndCopy", async (_event, currentFilePath) => {
+    const docsPath = getDocsPath();
+    if (!docsPath) {
+      throw new Error("No project loaded");
+    }
+
+    // Open file dialog to select image
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ["openFile"],
+      title: "Select Image",
+      filters: [
+        { name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "svg", "webp", "ico", "bmp"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    const sourcePath = result.filePaths[0];
+    const copyResult = await copyAsset(docsPath, sourcePath);
+
+    // Calculate relative path from current file if provided
+    const relativePath = currentFilePath
+      ? getRelativeAssetPath(currentFilePath, copyResult.relativePath)
+      : copyResult.relativePath;
+
+    return {
+      ...copyResult,
+      markdownPath: relativePath,
+    };
+  });
+
+  ipcMain.handle("asset:copy", async (_event, sourcePath, currentFilePath) => {
+    const docsPath = getDocsPath();
+    if (!docsPath) {
+      throw new Error("No project loaded");
+    }
+
+    const copyResult = await copyAsset(docsPath, sourcePath);
+
+    // Calculate relative path from current file if provided
+    const relativePath = currentFilePath
+      ? getRelativeAssetPath(currentFilePath, copyResult.relativePath)
+      : copyResult.relativePath;
+
+    return {
+      ...copyResult,
+      markdownPath: relativePath,
+    };
+  });
+
+  ipcMain.handle("asset:list", async () => {
+    const docsPath = getDocsPath();
+    if (!docsPath) {
+      throw new Error("No project loaded");
+    }
+    return listAssets(docsPath);
+  });
+
+  ipcMain.handle("asset:delete", async (_event, relativePath) => {
+    const docsPath = getDocsPath();
+    if (!docsPath) {
+      throw new Error("No project loaded");
+    }
+    return deleteAsset(docsPath, relativePath);
+  });
+
+  ipcMain.handle("asset:getRelativePath", async (_event, markdownPath, assetPath) => {
+    return getRelativeAssetPath(markdownPath, assetPath);
   });
 
   // Preview handlers

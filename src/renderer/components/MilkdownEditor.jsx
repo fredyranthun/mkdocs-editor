@@ -10,8 +10,8 @@
  */
 
 import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
-import { Editor, rootCtx, defaultValueCtx, remarkStringifyOptionsCtx } from "@milkdown/kit/core";
-import { commonmark } from "@milkdown/kit/preset/commonmark";
+import { Editor, rootCtx, defaultValueCtx, remarkStringifyOptionsCtx, editorViewCtx } from "@milkdown/kit/core";
+import { commonmark, insertImageCommand } from "@milkdown/kit/preset/commonmark";
 import { gfm } from "@milkdown/kit/preset/gfm";
 import { history } from "@milkdown/kit/plugin/history";
 import { clipboard } from "@milkdown/kit/plugin/clipboard";
@@ -94,6 +94,12 @@ const MilkdownEditorInner = forwardRef(function MilkdownEditorInner({ initialCon
           // insertMermaidCommand expects a string template type, not an object
           const template = typeof templateType === "object" ? templateType.template : templateType;
           editor.action(callCommand(insertMermaidCommand.key, template));
+        }
+      },
+      insertImage: ({ src, alt = "", title = "" }) => {
+        const editor = getEditor();
+        if (editor) {
+          editor.action(callCommand(insertImageCommand.key, { src, alt, title }));
         }
       },
       isReady: () => !loading && !!getEditor(),

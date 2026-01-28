@@ -73,6 +73,105 @@ const api = {
      * @returns {Promise<boolean>}
      */
     exists: (relativePath) => ipcRenderer.invoke("page:exists", relativePath),
+
+    /**
+     * Creates a new markdown file
+     * @param {string} relativePath - Path relative to docs directory
+     * @param {string} [content=''] - Initial content
+     * @returns {Promise<{path: string, mtime: number}>}
+     */
+    create: (relativePath, content) => ipcRenderer.invoke("page:create", relativePath, content),
+
+    /**
+     * Deletes a markdown file
+     * @param {string} relativePath - Path relative to docs directory
+     * @returns {Promise<{path: string, deleted: boolean}>}
+     */
+    delete: (relativePath) => ipcRenderer.invoke("page:delete", relativePath),
+
+    /**
+     * Renames a markdown file (same directory)
+     * @param {string} oldPath - Current path relative to docs directory
+     * @param {string} newPath - New path relative to docs directory
+     * @returns {Promise<{oldPath: string, newPath: string, mtime: number}>}
+     */
+    rename: (oldPath, newPath) => ipcRenderer.invoke("page:rename", oldPath, newPath),
+
+    /**
+     * Moves a markdown file to a different location
+     * @param {string} oldPath - Current path relative to docs directory
+     * @param {string} newPath - New path relative to docs directory
+     * @returns {Promise<{oldPath: string, newPath: string, mtime: number}>}
+     */
+    move: (oldPath, newPath) => ipcRenderer.invoke("page:move", oldPath, newPath),
+  },
+
+  /**
+   * Directory operations
+   */
+  directory: {
+    /**
+     * Creates a new directory
+     * @param {string} relativePath - Path relative to docs directory
+     * @returns {Promise<{path: string, created: boolean}>}
+     */
+    create: (relativePath) => ipcRenderer.invoke("directory:create", relativePath),
+
+    /**
+     * Deletes an empty directory
+     * @param {string} relativePath - Path relative to docs directory
+     * @returns {Promise<{path: string, deleted: boolean}>}
+     */
+    delete: (relativePath) => ipcRenderer.invoke("directory:delete", relativePath),
+
+    /**
+     * Renames a directory
+     * @param {string} oldPath - Current path relative to docs directory
+     * @param {string} newPath - New path relative to docs directory
+     * @returns {Promise<{oldPath: string, newPath: string}>}
+     */
+    rename: (oldPath, newPath) => ipcRenderer.invoke("directory:rename", oldPath, newPath),
+  },
+
+  /**
+   * Asset (image) operations
+   */
+  asset: {
+    /**
+     * Opens file dialog to select an image, copies it to assets folder
+     * @param {string} [currentFilePath] - Current markdown file path for relative path calculation
+     * @returns {Promise<{relativePath: string, absolutePath: string, filename: string, markdownPath: string}|null>}
+     */
+    selectAndCopy: (currentFilePath) => ipcRenderer.invoke("asset:selectAndCopy", currentFilePath),
+
+    /**
+     * Copies an image file to assets folder
+     * @param {string} sourcePath - Absolute path to source image
+     * @param {string} [currentFilePath] - Current markdown file path for relative path calculation
+     * @returns {Promise<{relativePath: string, absolutePath: string, filename: string, markdownPath: string}>}
+     */
+    copy: (sourcePath, currentFilePath) => ipcRenderer.invoke("asset:copy", sourcePath, currentFilePath),
+
+    /**
+     * Lists all assets in the assets folder
+     * @returns {Promise<Array<{name: string, path: string, absolutePath: string, size: number, mtime: number}>>}
+     */
+    list: () => ipcRenderer.invoke("asset:list"),
+
+    /**
+     * Deletes an asset file
+     * @param {string} relativePath - Path relative to docs directory
+     * @returns {Promise<{path: string, deleted: boolean}>}
+     */
+    delete: (relativePath) => ipcRenderer.invoke("asset:delete", relativePath),
+
+    /**
+     * Gets relative path from a markdown file to an asset
+     * @param {string} markdownPath - Relative path to markdown file
+     * @param {string} assetPath - Relative path to asset
+     * @returns {Promise<string>}
+     */
+    getRelativePath: (markdownPath, assetPath) => ipcRenderer.invoke("asset:getRelativePath", markdownPath, assetPath),
   },
 
   /**

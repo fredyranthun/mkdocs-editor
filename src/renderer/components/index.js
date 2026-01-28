@@ -7,3 +7,6 @@ export { PreviewPane } from "./PreviewPane";
 export { Header } from "./Header";
 export { StatusBar } from "./StatusBar";
 export { MilkdownEditor } from "./MilkdownEditor";
+export { ContextMenu } from "./ContextMenu";
+export { InputDialog } from "./InputDialog";
+export { ConfirmDialog } from "./ConfirmDialog";

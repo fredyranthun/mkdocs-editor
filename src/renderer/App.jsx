@@ -159,6 +159,30 @@ export function App() {
     [updateContent, hasChanges],
   );
 
+  // Handle file created
+  const handleFileCreated = useCallback((filePath) => {
+    setStatusMessage(`Created: ${filePath}`);
+  }, []);
+
+  // Handle file deleted
+  const handleFileDeleted = useCallback(
+    (filePath) => {
+      setStatusMessage(`Deleted: ${filePath}`);
+      // If deleted file was current, clear editor
+      if (currentFile === filePath) {
+        setCurrentFile(null);
+        loadContent("");
+        setIsModified(false);
+      }
+    },
+    [currentFile, loadContent],
+  );
+
+  // Handle file renamed
+  const handleFileRenamed = useCallback((oldPath, newPath) => {
+    setStatusMessage(`Renamed: ${oldPath} → ${newPath}`);
+  }, []);
+
   // Preview controls
   const handleStartPreview = useCallback(async () => {
     try {
@@ -212,6 +236,9 @@ export function App() {
           currentFile={currentFile}
           onFileSelect={handleOpenFile}
           onRefresh={refreshFileTree}
+          onFileCreated={handleFileCreated}
+          onFileDeleted={handleFileDeleted}
+          onFileRenamed={handleFileRenamed}
         />
 
         <EditorPane

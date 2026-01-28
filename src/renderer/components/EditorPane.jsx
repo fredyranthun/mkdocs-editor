@@ -36,6 +36,26 @@ export function EditorPane({ filePath, content, isModified, onChange, projectCon
     }
   }, []);
 
+  const handleInsertImage = useCallback(async () => {
+    if (!filePath || !editorRef.current?.isReady()) return;
+
+    try {
+      // Open file dialog and copy image to assets
+      const result = await window.api.asset.selectAndCopy(filePath);
+      if (result) {
+        // Insert image with the relative path
+        editorRef.current.insertImage({
+          src: result.markdownPath,
+          alt: result.filename.replace(/\.[^.]+$/, ""), // Use filename without extension as alt
+          title: "",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to insert image:", err);
+      alert(`Failed to insert image: ${err.message}`);
+    }
+  }, [filePath]);
+
   // Show placeholder if no file selected
   if (!filePath) {
     return (
@@ -69,6 +89,7 @@ export function EditorPane({ filePath, content, isModified, onChange, projectCon
           onInsertAdmonition={handleInsertAdmonition}
           onInsertMermaid={handleInsertMermaid}
           onInsertCodeBlock={handleInsertCodeBlock}
+          onInsertImage={handleInsertImage}
           disabled={!filePath}
         />
       )}
