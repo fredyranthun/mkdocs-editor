@@ -6,13 +6,16 @@
  * Shows placeholder when no file is open.
  */
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { MilkdownEditor } from "./MilkdownEditor";
 import { EditorToolbar } from "./EditorToolbar";
+import { MarkdownSourceModal } from "./MarkdownSourceModal";
 
 export function EditorPane({ filePath, content, isModified, onChange, projectConfig, features, guidance, hasProject }) {
   // Reference to editor for command execution
   const editorRef = useRef(null);
+  // State for View Source modal
+  const [showSourceModal, setShowSourceModal] = useState(false);
 
   // Insert handlers - use Milkdown commands via ref
   const handleInsertAdmonition = useCallback((selection) => {
@@ -56,6 +59,11 @@ export function EditorPane({ filePath, content, isModified, onChange, projectCon
     }
   }, [filePath]);
 
+  // View Source handler
+  const handleViewSource = useCallback(() => {
+    setShowSourceModal(true);
+  }, []);
+
   // Show placeholder if no file selected
   if (!filePath) {
     return (
@@ -90,6 +98,7 @@ export function EditorPane({ filePath, content, isModified, onChange, projectCon
           onInsertMermaid={handleInsertMermaid}
           onInsertCodeBlock={handleInsertCodeBlock}
           onInsertImage={handleInsertImage}
+          onViewSource={handleViewSource}
           disabled={!filePath}
         />
       )}
@@ -106,6 +115,14 @@ export function EditorPane({ filePath, content, isModified, onChange, projectCon
           />
         )}
       </div>
+
+      {/* View Source Modal */}
+      <MarkdownSourceModal
+        isOpen={showSourceModal}
+        content={content}
+        filePath={filePath}
+        onClose={() => setShowSourceModal(false)}
+      />
     </section>
   );
 }

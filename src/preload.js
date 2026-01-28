@@ -4,9 +4,104 @@
  * This module exposes a minimal, typed API to the renderer process
  * via contextBridge. All filesystem and process operations happen
  * in the main process and are called via IPC.
+ *
+ * Security: All IPC channels are validated against a whitelist
+ * to prevent unauthorized access to main process functionality.
  */
 
 import { contextBridge, ipcRenderer } from "electron";
+
+/**
+ * Whitelist of valid IPC invoke channels (renderer → main)
+ * @type {Set<string>}
+ */
+const VALID_INVOKE_CHANNELS = new Set([
+  // Project operations
+  "project:open",
+  "project:load",
+  "project:getTree",
+  "project:getCurrent",
+  "project:close",
+
+  // Page/file operations
+  "page:read",
+  "page:write",
+  "page:exists",
+  "page:create",
+  "page:delete",
+  "page:rename",
+  "page:move",
+
+  // Directory operations
+  "directory:create",
+  "directory:delete",
+  "directory:rename",
+
+  // Asset operations
+  "asset:selectAndCopy",
+  "asset:copy",
+  "asset:list",
+  "asset:delete",
+  "asset:getRelativePath",
+
+  // Preview operations
+  "preview:start",
+  "preview:stop",
+  "preview:restart",
+  "preview:getStatus",
+  "preview:getLogs",
+  "preview:clearLogs",
+  "preview:getPageUrl",
+  "preview:isHealthy",
+  "preview:checkMkDocs",
+
+  // Python environment operations
+  "pythonEnv:checkPython",
+  "pythonEnv:detectProjectEnv",
+  "pythonEnv:getStatus",
+  "pythonEnv:ensure",
+  "pythonEnv:reinstall",
+  "pythonEnv:getLogs",
+
+  // App operations
+  "app:getVersion",
+]);
+
+/**
+ * Whitelist of valid IPC receive channels (main → renderer)
+ * @type {Set<string>}
+ */
+const VALID_RECEIVE_CHANNELS = new Set(["preview:status", "preview:log", "pythonEnv:status", "pythonEnv:log"]);
+
+/**
+ * Secure invoke wrapper - validates channel before sending
+ * @param {string} channel
+ * @param  {...any} args
+ * @returns {Promise<any>}
+ */
+function secureInvoke(channel, ...args) {
+  if (!VALID_INVOKE_CHANNELS.has(channel)) {
+    console.error(`[Security] Blocked IPC invoke on invalid channel: ${channel}`);
+    return Promise.reject(new Error(`Invalid IPC channel: ${channel}`));
+  }
+  return ipcRenderer.invoke(channel, ...args);
+}
+
+/**
+ * Secure event listener wrapper - validates channel before subscribing
+ * @param {string} channel
+ * @param {Function} callback
+ * @returns {Function} Unsubscribe function
+ */
+function secureOn(channel, callback) {
+  if (!VALID_RECEIVE_CHANNELS.has(channel)) {
+    console.error(`[Security] Blocked IPC listener on invalid channel: ${channel}`);
+    return () => {};
+  }
+  const handler = (_event, ...args) => callback(...args);
+  ipcRenderer.on(channel, handler);
+  return () => ipcRenderer.removeListener(channel, handler);
+}
 
 /**
  * API exposed to the renderer as window.api
@@ -20,32 +115,32 @@ const api = {
      * Opens a folder selection dialog and loads the project
      * @returns {Promise<{projectRoot: string, config: object}|null>}
      */
-    open: () => ipcRenderer.invoke("project:open"),
+    open: () => secureInvoke("project:open"),
 
     /**
      * Loads a project from a specific path
      * @param {string} projectPath
      * @returns {Promise<{projectRoot: string, config: object}>}
      */
-    load: (projectPath) => ipcRenderer.invoke("project:load", projectPath),
+    load: (projectPath) => secureInvoke("project:load", projectPath),
 
     /**
      * Gets the file tree for the current project
      * @returns {Promise<Array>}
      */
-    getTree: () => ipcRenderer.invoke("project:getTree"),
+    getTree: () => secureInvoke("project:getTree"),
 
     /**
      * Gets current project info
      * @returns {Promise<{projectRoot: string, config: object}|null>}
      */
-    getCurrent: () => ipcRenderer.invoke("project:getCurrent"),
+    getCurrent: () => secureInvoke("project:getCurrent"),
 
     /**
      * Closes the current project
      * @returns {Promise<void>}
      */
-    close: () => ipcRenderer.invoke("project:close"),
+    close: () => secureInvoke("project:close"),
   },
 
   /**
@@ -57,7 +152,7 @@ const api = {
      * @param {string} relativePath - Path relative to docs directory
      * @returns {Promise<{path: string, content: string, mtime: number}>}
      */
-    read: (relativePath) => ipcRenderer.invoke("page:read", relativePath),
+    read: (relativePath) => secureInvoke("page:read", relativePath),
 
     /**
      * Writes content to a markdown file
@@ -65,14 +160,14 @@ const api = {
      * @param {string} content - Markdown content
      * @returns {Promise<{path: string, mtime: number}>}
      */
-    write: (relativePath, content) => ipcRenderer.invoke("page:write", relativePath, content),
+    write: (relativePath, content) => secureInvoke("page:write", relativePath, content),
 
     /**
      * Checks if a file exists
      * @param {string} relativePath - Path relative to docs directory
      * @returns {Promise<boolean>}
      */
-    exists: (relativePath) => ipcRenderer.invoke("page:exists", relativePath),
+    exists: (relativePath) => secureInvoke("page:exists", relativePath),
 
     /**
      * Creates a new markdown file
@@ -80,14 +175,14 @@ const api = {
      * @param {string} [content=''] - Initial content
      * @returns {Promise<{path: string, mtime: number}>}
      */
-    create: (relativePath, content) => ipcRenderer.invoke("page:create", relativePath, content),
+    create: (relativePath, content) => secureInvoke("page:create", relativePath, content),
 
     /**
      * Deletes a markdown file
      * @param {string} relativePath - Path relative to docs directory
      * @returns {Promise<{path: string, deleted: boolean}>}
      */
-    delete: (relativePath) => ipcRenderer.invoke("page:delete", relativePath),
+    delete: (relativePath) => secureInvoke("page:delete", relativePath),
 
     /**
      * Renames a markdown file (same directory)
@@ -95,7 +190,7 @@ const api = {
      * @param {string} newPath - New path relative to docs directory
      * @returns {Promise<{oldPath: string, newPath: string, mtime: number}>}
      */
-    rename: (oldPath, newPath) => ipcRenderer.invoke("page:rename", oldPath, newPath),
+    rename: (oldPath, newPath) => secureInvoke("page:rename", oldPath, newPath),
 
     /**
      * Moves a markdown file to a different location
@@ -103,7 +198,7 @@ const api = {
      * @param {string} newPath - New path relative to docs directory
      * @returns {Promise<{oldPath: string, newPath: string, mtime: number}>}
      */
-    move: (oldPath, newPath) => ipcRenderer.invoke("page:move", oldPath, newPath),
+    move: (oldPath, newPath) => secureInvoke("page:move", oldPath, newPath),
   },
 
   /**
@@ -115,14 +210,14 @@ const api = {
      * @param {string} relativePath - Path relative to docs directory
      * @returns {Promise<{path: string, created: boolean}>}
      */
-    create: (relativePath) => ipcRenderer.invoke("directory:create", relativePath),
+    create: (relativePath) => secureInvoke("directory:create", relativePath),
 
     /**
      * Deletes an empty directory
      * @param {string} relativePath - Path relative to docs directory
      * @returns {Promise<{path: string, deleted: boolean}>}
      */
-    delete: (relativePath) => ipcRenderer.invoke("directory:delete", relativePath),
+    delete: (relativePath) => secureInvoke("directory:delete", relativePath),
 
     /**
      * Renames a directory
@@ -130,7 +225,7 @@ const api = {
      * @param {string} newPath - New path relative to docs directory
      * @returns {Promise<{oldPath: string, newPath: string}>}
      */
-    rename: (oldPath, newPath) => ipcRenderer.invoke("directory:rename", oldPath, newPath),
+    rename: (oldPath, newPath) => secureInvoke("directory:rename", oldPath, newPath),
   },
 
   /**
@@ -142,7 +237,7 @@ const api = {
      * @param {string} [currentFilePath] - Current markdown file path for relative path calculation
      * @returns {Promise<{relativePath: string, absolutePath: string, filename: string, markdownPath: string}|null>}
      */
-    selectAndCopy: (currentFilePath) => ipcRenderer.invoke("asset:selectAndCopy", currentFilePath),
+    selectAndCopy: (currentFilePath) => secureInvoke("asset:selectAndCopy", currentFilePath),
 
     /**
      * Copies an image file to assets folder
@@ -150,20 +245,20 @@ const api = {
      * @param {string} [currentFilePath] - Current markdown file path for relative path calculation
      * @returns {Promise<{relativePath: string, absolutePath: string, filename: string, markdownPath: string}>}
      */
-    copy: (sourcePath, currentFilePath) => ipcRenderer.invoke("asset:copy", sourcePath, currentFilePath),
+    copy: (sourcePath, currentFilePath) => secureInvoke("asset:copy", sourcePath, currentFilePath),
 
     /**
      * Lists all assets in the assets folder
      * @returns {Promise<Array<{name: string, path: string, absolutePath: string, size: number, mtime: number}>>}
      */
-    list: () => ipcRenderer.invoke("asset:list"),
+    list: () => secureInvoke("asset:list"),
 
     /**
      * Deletes an asset file
      * @param {string} relativePath - Path relative to docs directory
      * @returns {Promise<{path: string, deleted: boolean}>}
      */
-    delete: (relativePath) => ipcRenderer.invoke("asset:delete", relativePath),
+    delete: (relativePath) => secureInvoke("asset:delete", relativePath),
 
     /**
      * Gets relative path from a markdown file to an asset
@@ -171,7 +266,7 @@ const api = {
      * @param {string} assetPath - Relative path to asset
      * @returns {Promise<string>}
      */
-    getRelativePath: (markdownPath, assetPath) => ipcRenderer.invoke("asset:getRelativePath", markdownPath, assetPath),
+    getRelativePath: (markdownPath, assetPath) => secureInvoke("asset:getRelativePath", markdownPath, assetPath),
   },
 
   /**
@@ -182,78 +277,70 @@ const api = {
      * Starts the preview server
      * @returns {Promise<{status: string, url: string|null, port: number|null, error: string|null}>}
      */
-    start: () => ipcRenderer.invoke("preview:start"),
+    start: () => secureInvoke("preview:start"),
 
     /**
      * Stops the preview server
      * @returns {Promise<{status: string}>}
      */
-    stop: () => ipcRenderer.invoke("preview:stop"),
+    stop: () => secureInvoke("preview:stop"),
 
     /**
      * Restarts the preview server
      * @returns {Promise<{status: string, url: string|null}>}
      */
-    restart: () => ipcRenderer.invoke("preview:restart"),
+    restart: () => secureInvoke("preview:restart"),
 
     /**
      * Gets current preview status
      * @returns {Promise<{status: string, url: string|null, port: number|null, error: string|null}>}
      */
-    getStatus: () => ipcRenderer.invoke("preview:getStatus"),
+    getStatus: () => secureInvoke("preview:getStatus"),
 
     /**
      * Gets preview logs
      * @returns {Promise<string[]>}
      */
-    getLogs: () => ipcRenderer.invoke("preview:getLogs"),
+    getLogs: () => secureInvoke("preview:getLogs"),
 
     /**
      * Clears preview logs
      * @returns {Promise<void>}
      */
-    clearLogs: () => ipcRenderer.invoke("preview:clearLogs"),
+    clearLogs: () => secureInvoke("preview:clearLogs"),
 
     /**
      * Gets the preview URL for a specific markdown file
      * @param {string} relativePath - Path relative to docs directory
      * @returns {Promise<string|null>}
      */
-    getPageUrl: (relativePath) => ipcRenderer.invoke("preview:getPageUrl", relativePath),
+    getPageUrl: (relativePath) => secureInvoke("preview:getPageUrl", relativePath),
 
     /**
      * Checks if the preview server is healthy
      * @returns {Promise<boolean>}
      */
-    isHealthy: () => ipcRenderer.invoke("preview:isHealthy"),
+    isHealthy: () => secureInvoke("preview:isHealthy"),
 
     /**
      * Checks if MkDocs is installed and available
      * @returns {Promise<{available: boolean, path?: string, version?: string, error?: string}>}
      */
-    checkMkDocs: () => ipcRenderer.invoke("preview:checkMkDocs"),
+    checkMkDocs: () => secureInvoke("preview:checkMkDocs"),
 
     /**
      * Subscribes to status changes
      * @param {Function} callback - Called with status object
      * @returns {Function} Unsubscribe function
      */
-    onStatus: (callback) => {
-      const handler = (_event, status) => callback(status);
-      ipcRenderer.on("preview:status", handler);
-      return () => ipcRenderer.removeListener("preview:status", handler);
-    },
+    onStatus: (callback) => secureOn("preview:status", callback),
 
     /**
      * Subscribes to log messages
      * @param {Function} callback - Called with log string
      * @returns {Function} Unsubscribe function
      */
-    onLog: (callback) => {
-      const handler = (_event, log) => callback(log);
-      ipcRenderer.on("preview:log", handler);
-      return () => ipcRenderer.removeListener("preview:log", handler);
-    },
+    onLog: (callback) => secureOn("preview:log", callback),
   },
 
   /**
@@ -264,60 +351,52 @@ const api = {
      * Checks if Python is available on the system
      * @returns {Promise<{available: boolean, path?: string, version?: string, error?: string}>}
      */
-    checkPython: () => ipcRenderer.invoke("pythonEnv:checkPython"),
+    checkPython: () => secureInvoke("pythonEnv:checkPython"),
 
     /**
      * Detects existing Python environments in a project
      * @param {string} [projectPath] - Path to check (defaults to current project)
      * @returns {Promise<{hasRequirements: boolean, hasPoetry: boolean, hasPipenv: boolean, hasVenv: boolean, hasAppVenv: boolean, existingVenvPath: string|null}>}
      */
-    detectProjectEnv: (projectPath) => ipcRenderer.invoke("pythonEnv:detectProjectEnv", projectPath),
+    detectProjectEnv: (projectPath) => secureInvoke("pythonEnv:detectProjectEnv", projectPath),
 
     /**
      * Gets current Python environment status
      * @returns {Promise<{status: string, pythonPath: string|null, mkdocsPath: string|null, venvPath: string|null, error: string|null, envType: string|null}>}
      */
-    getStatus: () => ipcRenderer.invoke("pythonEnv:getStatus"),
+    getStatus: () => secureInvoke("pythonEnv:getStatus"),
 
     /**
      * Ensures Python environment is ready (creates venv and installs mkdocs if needed)
      * @returns {Promise<{status: string, pythonPath: string|null, mkdocsPath: string|null, venvPath: string|null, error: string|null, envType: string|null}>}
      */
-    ensure: () => ipcRenderer.invoke("pythonEnv:ensure"),
+    ensure: () => secureInvoke("pythonEnv:ensure"),
 
     /**
      * Reinstalls MkDocs in the app venv (for fixing corrupted installs)
      * @returns {Promise<{status: string, pythonPath: string|null, mkdocsPath: string|null, venvPath: string|null, error: string|null, envType: string|null}>}
      */
-    reinstall: () => ipcRenderer.invoke("pythonEnv:reinstall"),
+    reinstall: () => secureInvoke("pythonEnv:reinstall"),
 
     /**
      * Gets Python environment logs
      * @returns {Promise<string[]>}
      */
-    getLogs: () => ipcRenderer.invoke("pythonEnv:getLogs"),
+    getLogs: () => secureInvoke("pythonEnv:getLogs"),
 
     /**
      * Subscribes to status changes
      * @param {Function} callback - Called with status object
      * @returns {Function} Unsubscribe function
      */
-    onStatus: (callback) => {
-      const handler = (_event, status) => callback(status);
-      ipcRenderer.on("pythonEnv:status", handler);
-      return () => ipcRenderer.removeListener("pythonEnv:status", handler);
-    },
+    onStatus: (callback) => secureOn("pythonEnv:status", callback),
 
     /**
      * Subscribes to log messages
      * @param {Function} callback - Called with log string
      * @returns {Function} Unsubscribe function
      */
-    onLog: (callback) => {
-      const handler = (_event, log) => callback(log);
-      ipcRenderer.on("pythonEnv:log", handler);
-      return () => ipcRenderer.removeListener("pythonEnv:log", handler);
-    },
+    onLog: (callback) => secureOn("pythonEnv:log", callback),
   },
 
   /**
@@ -328,7 +407,7 @@ const api = {
      * Gets app version
      * @returns {Promise<string>}
      */
-    getVersion: () => ipcRenderer.invoke("app:getVersion"),
+    getVersion: () => secureInvoke("app:getVersion"),
   },
 };
 

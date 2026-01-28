@@ -152,6 +152,7 @@ export function EditorToolbar({
   onInsertMermaid,
   onInsertCodeBlock,
   onInsertImage,
+  onViewSource,
   disabled,
 }) {
   const [showGuidance, setShowGuidance] = useState(null);
@@ -259,6 +260,16 @@ export function EditorToolbar({
             disabled={disabled}
             title="Insert image (copies to assets folder)"
             onClick={onInsertImage}
+          />
+        </div>
+
+        <div className="toolbar-group toolbar-group--right">
+          <ToolbarButton
+            icon="📝"
+            label="Source"
+            disabled={disabled}
+            title="View raw markdown source (read-only)"
+            onClick={onViewSource}
           />
         </div>
 

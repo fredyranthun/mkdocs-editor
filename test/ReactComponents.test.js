@@ -98,6 +98,24 @@ describe("Component Module Structure", () => {
       expect(components.Header).toBeDefined();
       expect(components.StatusBar).toBeDefined();
       expect(components.MilkdownEditor).toBeDefined();
+      expect(components.MarkdownSourceModal).toBeDefined();
+      expect(components.RawBlockEditor).toBeDefined();
+    });
+  });
+
+  describe("MarkdownSourceModal Component", () => {
+    it("should export MarkdownSourceModal component", async () => {
+      const { MarkdownSourceModal } = await import("../src/renderer/components/MarkdownSourceModal.jsx");
+      expect(MarkdownSourceModal).toBeDefined();
+      expect(typeof MarkdownSourceModal).toBe("function");
+    });
+  });
+
+  describe("RawBlockEditor Component", () => {
+    it("should export RawBlockEditor component", async () => {
+      const { RawBlockEditor } = await import("../src/renderer/components/RawBlockEditor.jsx");
+      expect(RawBlockEditor).toBeDefined();
+      expect(typeof RawBlockEditor).toBe("function");
     });
   });
 });

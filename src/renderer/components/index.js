@@ -10,3 +10,5 @@ export { MilkdownEditor } from "./MilkdownEditor";
 export { ContextMenu } from "./ContextMenu";
 export { InputDialog } from "./InputDialog";
 export { ConfirmDialog } from "./ConfirmDialog";
+export { MarkdownSourceModal } from "./MarkdownSourceModal";
+export { RawBlockEditor } from "./RawBlockEditor";

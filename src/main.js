@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, session } from "electron";
 import path from "node:path";
 import started from "electron-squirrel-startup";
 
@@ -27,6 +27,10 @@ import {
   detectProjectEnvironment,
 } from "./main/services/PythonEnvironmentService.js";
 
+// Security
+import { VALID_INVOKE_CHANNELS, isValidInvokeChannel } from "./main/security/ipcChannelWhitelist.js";
+import { isLocalhostUrl, getRendererCSP, getWebviewSecurityPrefs } from "./main/security/securityUtils.js";
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
@@ -49,10 +53,20 @@ function getDocsPath() {
 
 /**
  * Sets up IPC handlers for main process services
+ * All handlers are validated against the channel whitelist
  */
 function setupIpcHandlers() {
+  // Validate that we only register whitelisted channels
+  const registerHandler = (channel, handler) => {
+    if (!isValidInvokeChannel(channel)) {
+      console.error(`[Security] Attempted to register non-whitelisted IPC channel: ${channel}`);
+      return;
+    }
+    ipcMain.handle(channel, handler);
+  };
+
   // Project handlers
-  ipcMain.handle("project:open", async () => {
+  registerHandler("project:open", async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ["openDirectory"],
       title: "Open MkDocs Project",
@@ -66,11 +80,11 @@ function setupIpcHandlers() {
     return handleProjectLoad(projectPath);
   });
 
-  ipcMain.handle("project:load", async (_event, projectPath) => {
+  registerHandler("project:load", async (_event, projectPath) => {
     return handleProjectLoad(projectPath);
   });
 
-  ipcMain.handle("project:getTree", async () => {
+  registerHandler("project:getTree", async () => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -78,7 +92,7 @@ function setupIpcHandlers() {
     return buildFileTree(docsPath);
   });
 
-  ipcMain.handle("project:getCurrent", () => {
+  registerHandler("project:getCurrent", () => {
     if (!currentProject) return null;
     return {
       projectRoot: currentProject.projectRoot,
@@ -86,12 +100,12 @@ function setupIpcHandlers() {
     };
   });
 
-  ipcMain.handle("project:close", async () => {
+  registerHandler("project:close", async () => {
     await handleProjectClose();
   });
 
   // Page handlers
-  ipcMain.handle("page:read", async (_event, relativePath) => {
+  registerHandler("page:read", async (_event, relativePath) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -99,7 +113,7 @@ function setupIpcHandlers() {
     return readFile(docsPath, relativePath);
   });
 
-  ipcMain.handle("page:write", async (_event, relativePath, content) => {
+  registerHandler("page:write", async (_event, relativePath, content) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -107,7 +121,7 @@ function setupIpcHandlers() {
     return writeFile(docsPath, relativePath, content);
   });
 
-  ipcMain.handle("page:exists", async (_event, relativePath) => {
+  registerHandler("page:exists", async (_event, relativePath) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -116,7 +130,7 @@ function setupIpcHandlers() {
   });
 
   // Page CRUD handlers
-  ipcMain.handle("page:create", async (_event, relativePath, content) => {
+  registerHandler("page:create", async (_event, relativePath, content) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -124,7 +138,7 @@ function setupIpcHandlers() {
     return createFile(docsPath, relativePath, content || "");
   });
 
-  ipcMain.handle("page:delete", async (_event, relativePath) => {
+  registerHandler("page:delete", async (_event, relativePath) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -132,7 +146,7 @@ function setupIpcHandlers() {
     return deleteFile(docsPath, relativePath);
   });
 
-  ipcMain.handle("page:rename", async (_event, oldPath, newPath) => {
+  registerHandler("page:rename", async (_event, oldPath, newPath) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -140,7 +154,7 @@ function setupIpcHandlers() {
     return renameFile(docsPath, oldPath, newPath);
   });
 
-  ipcMain.handle("page:move", async (_event, oldPath, newPath) => {
+  registerHandler("page:move", async (_event, oldPath, newPath) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -149,7 +163,7 @@ function setupIpcHandlers() {
   });
 
   // Directory CRUD handlers
-  ipcMain.handle("directory:create", async (_event, relativePath) => {
+  registerHandler("directory:create", async (_event, relativePath) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -157,7 +171,7 @@ function setupIpcHandlers() {
     return createDirectory(docsPath, relativePath);
   });
 
-  ipcMain.handle("directory:delete", async (_event, relativePath) => {
+  registerHandler("directory:delete", async (_event, relativePath) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -165,7 +179,7 @@ function setupIpcHandlers() {
     return deleteDirectory(docsPath, relativePath);
   });
 
-  ipcMain.handle("directory:rename", async (_event, oldPath, newPath) => {
+  registerHandler("directory:rename", async (_event, oldPath, newPath) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -174,7 +188,7 @@ function setupIpcHandlers() {
   });
 
   // Asset handlers
-  ipcMain.handle("asset:selectAndCopy", async (_event, currentFilePath) => {
+  registerHandler("asset:selectAndCopy", async (_event, currentFilePath) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -208,7 +222,7 @@ function setupIpcHandlers() {
     };
   });
 
-  ipcMain.handle("asset:copy", async (_event, sourcePath, currentFilePath) => {
+  registerHandler("asset:copy", async (_event, sourcePath, currentFilePath) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -227,7 +241,7 @@ function setupIpcHandlers() {
     };
   });
 
-  ipcMain.handle("asset:list", async () => {
+  registerHandler("asset:list", async () => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -235,7 +249,7 @@ function setupIpcHandlers() {
     return listAssets(docsPath);
   });
 
-  ipcMain.handle("asset:delete", async (_event, relativePath) => {
+  registerHandler("asset:delete", async (_event, relativePath) => {
     const docsPath = getDocsPath();
     if (!docsPath) {
       throw new Error("No project loaded");
@@ -243,76 +257,76 @@ function setupIpcHandlers() {
     return deleteAsset(docsPath, relativePath);
   });
 
-  ipcMain.handle("asset:getRelativePath", async (_event, markdownPath, assetPath) => {
+  registerHandler("asset:getRelativePath", async (_event, markdownPath, assetPath) => {
     return getRelativeAssetPath(markdownPath, assetPath);
   });
 
   // Preview handlers
-  ipcMain.handle("preview:start", async () => {
+  registerHandler("preview:start", async () => {
     if (!previewService) {
       throw new Error("No project loaded");
     }
     return previewService.start();
   });
 
-  ipcMain.handle("preview:stop", async () => {
+  registerHandler("preview:stop", async () => {
     if (!previewService) {
       return { status: "stopped" };
     }
     return previewService.stop();
   });
 
-  ipcMain.handle("preview:restart", async () => {
+  registerHandler("preview:restart", async () => {
     if (!previewService) {
       throw new Error("No project loaded");
     }
     return previewService.restart();
   });
 
-  ipcMain.handle("preview:getStatus", () => {
+  registerHandler("preview:getStatus", () => {
     if (!previewService) {
       return { status: "stopped", url: null, port: null, error: null };
     }
     return previewService.getState();
   });
 
-  ipcMain.handle("preview:getLogs", () => {
+  registerHandler("preview:getLogs", () => {
     if (!previewService) {
       return [];
     }
     return previewService.getLogs();
   });
 
-  ipcMain.handle("preview:clearLogs", () => {
+  registerHandler("preview:clearLogs", () => {
     if (previewService) {
       previewService.clearLogs();
     }
   });
 
-  ipcMain.handle("preview:getPageUrl", (_event, relativePath) => {
+  registerHandler("preview:getPageUrl", (_event, relativePath) => {
     if (!previewService) {
       return null;
     }
     return previewService.getPageUrl(relativePath);
   });
 
-  ipcMain.handle("preview:isHealthy", async () => {
+  registerHandler("preview:isHealthy", async () => {
     if (!previewService) {
       return false;
     }
     return previewService.isHealthy();
   });
 
-  ipcMain.handle("preview:checkMkDocs", () => {
+  registerHandler("preview:checkMkDocs", () => {
     return checkMkDocsAvailability();
   });
 
   // Python environment handlers
-  ipcMain.handle("pythonEnv:checkPython", () => {
+  registerHandler("pythonEnv:checkPython", () => {
     return checkPythonAvailability();
   });
 
-  ipcMain.handle("pythonEnv:detectProjectEnv", async (_event, projectPath) => {
+  registerHandler("pythonEnv:detectProjectEnv", async (_event, projectPath) => {
     const targetPath = projectPath || (currentProject ? currentProject.projectRoot : null);
     if (!targetPath) {
       throw new Error("No project path provided and no project loaded");
@@ -320,7 +334,7 @@ function setupIpcHandlers() {
     return detectProjectEnvironment(targetPath);
   });
 
-  ipcMain.handle("pythonEnv:getStatus", () => {
+  registerHandler("pythonEnv:getStatus", () => {
     if (!pythonEnvService) {
       return {
         status: "not-initialized",
@@ -334,21 +348,21 @@ function setupIpcHandlers() {
     return pythonEnvService.getState();
   });
 
-  ipcMain.handle("pythonEnv:ensure", async () => {
+  registerHandler("pythonEnv:ensure", async () => {
     if (!pythonEnvService) {
       throw new Error("No project loaded");
     }
     return pythonEnvService.ensureEnvironment();
   });
 
-  ipcMain.handle("pythonEnv:reinstall", async () => {
+  registerHandler("pythonEnv:reinstall", async () => {
     if (!pythonEnvService) {
       throw new Error("No project loaded");
     }
     return pythonEnvService.reinstall();
   });
 
-  ipcMain.handle("pythonEnv:getLogs", () => {
+  registerHandler("pythonEnv:getLogs", () => {
     if (!pythonEnvService) {
       return [];
     }
@@ -356,7 +370,7 @@ function setupIpcHandlers() {
   });
 
   // App handlers
-  ipcMain.handle("app:getVersion", () => {
+  registerHandler("app:getVersion", () => {
     return app.getVersion();
   });
 }
@@ -437,9 +451,50 @@ const createWindow = () => {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      nodeIntegrationInWorker: false,
+      nodeIntegrationInSubFrames: false,
       sandbox: false, // Required for preload to work with ESM
       webviewTag: true, // Enable webview tag for preview pane
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false,
+      enableBlinkFeatures: "",
     },
+  });
+
+  // Set up Content Security Policy for renderer
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        "Content-Security-Policy": [getRendererCSP()],
+      },
+    });
+  });
+
+  // Block navigation to external URLs in the main window
+  mainWindow.webContents.on("will-navigate", (event, navigationUrl) => {
+    // Allow navigation to dev server URL in development
+    if (MAIN_WINDOW_VITE_DEV_SERVER_URL && navigationUrl.startsWith(MAIN_WINDOW_VITE_DEV_SERVER_URL)) {
+      return;
+    }
+    // Allow file:// URLs for production
+    if (navigationUrl.startsWith("file://")) {
+      return;
+    }
+    // Block all other external navigations
+    console.warn("[Security] Blocked navigation to:", navigationUrl);
+    event.preventDefault();
+  });
+
+  // Block new window creation
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Allow opening localhost URLs in preview (redirected to webview)
+    if (isLocalhostUrl(url)) {
+      return { action: "deny" };
+    }
+    console.warn("[Security] Blocked window open to:", url);
+    return { action: "deny" };
   });
 
   // and load the index.html of the app.
@@ -464,39 +519,18 @@ const createWindow = () => {
     delete webPreferences.preload;
     delete webPreferences.preloadURL;
 
-    // Disable Node.js integration
-    webPreferences.nodeIntegration = false;
-    webPreferences.nodeIntegrationInWorker = false;
-    webPreferences.contextIsolation = true;
+    // Apply strict security preferences for webview
+    const securityPrefs = getWebviewSecurityPrefs();
+    Object.assign(webPreferences, securityPrefs);
 
     // Restrict webview to localhost URLs only
     const srcUrl = params.src;
     if (!isLocalhostUrl(srcUrl)) {
-      console.warn("[Webview] Blocked non-localhost URL:", srcUrl);
+      console.warn("[Security] Blocked webview with non-localhost URL:", srcUrl);
       event.preventDefault();
     }
   });
 };
-
-/**
- * Check if a URL is a localhost URL (for webview security)
- * @param {string} url
- * @returns {boolean}
- */
-function isLocalhostUrl(url) {
-  if (!url || url === "about:blank") return true;
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.hostname === "localhost" ||
-      parsed.hostname === "127.0.0.1" ||
-      parsed.hostname === "::1" ||
-      parsed.hostname.endsWith(".localhost")
-    );
-  } catch {
-    return false;
-  }
-}
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

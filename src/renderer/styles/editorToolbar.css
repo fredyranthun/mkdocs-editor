@@ -30,6 +30,10 @@
   gap: 4px;
 }
 
+.toolbar-group--right {
+  margin-left: auto;
+}
+
 .toolbar-group-label {
   font-size: 11px;
   color: var(--text-muted);
