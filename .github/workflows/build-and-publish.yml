@@ -1,0 +1,217 @@
+name: Build and Publish
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# Prevent concurrent builds on the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ============================================================================
+  # Build job - runs on all three platforms in parallel
+  # ============================================================================
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux build
+          - os: ubuntu-latest
+            platform: linux
+            artifact-name: linux-builds
+          # macOS build (Intel + Apple Silicon universal)
+          - os: macos-latest
+            platform: darwin
+            artifact-name: macos-builds
+          # Windows build
+          - os: windows-latest
+            platform: win32
+            artifact-name: windows-builds
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      # ========================================================================
+      # Linux-specific dependencies
+      # ========================================================================
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            dpkg \
+            fakeroot \
+            rpm
+
+      # ========================================================================
+      # macOS-specific setup
+      # ========================================================================
+      - name: Setup macOS code signing
+        if: matrix.platform == 'darwin'
+        env:
+          # These secrets need to be configured in GitHub repository settings
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+        run: |
+          # Only setup signing if certificates are available
+          if [ -n "$APPLE_CERTIFICATE" ]; then
+            echo "Setting up code signing..."
+            # Create a temporary keychain
+            KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+            security create-keychain -p "$APPLE_KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+            security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+            security unlock-keychain -p "$APPLE_KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+            
+            # Import certificate
+            echo "$APPLE_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
+            security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" \
+              -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+            security list-keychain -d user -s $KEYCHAIN_PATH
+            
+            echo "Code signing configured successfully"
+          else
+            echo "No code signing certificate provided, skipping..."
+          fi
+
+      # ========================================================================
+      # Windows-specific setup
+      # ========================================================================
+      - name: Setup Windows code signing
+        if: matrix.platform == 'win32'
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ($env:WINDOWS_CERTIFICATE) {
+            echo "Setting up Windows code signing..."
+            $certBytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+            $certPath = "$env:RUNNER_TEMP\certificate.pfx"
+            [IO.File]::WriteAllBytes($certPath, $certBytes)
+            echo "WINDOWS_CERT_PATH=$certPath" >> $env:GITHUB_ENV
+            echo "Code signing certificate configured"
+          } else {
+            echo "No code signing certificate provided, skipping..."
+          }
+        shell: pwsh
+
+      # ========================================================================
+      # Build steps (common to all platforms)
+      # ========================================================================
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build and make distributables
+        env:
+          # GitHub token for auto-update and release features
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS notarization (optional)
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows signing
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: npm run make -- --platform=${{ matrix.platform }}
+
+      # ========================================================================
+      # Upload build artifacts
+      # ========================================================================
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: |
+            out/make/**/*.deb
+            out/make/**/*.rpm
+            out/make/**/*.zip
+            out/make/**/*.dmg
+            out/make/**/*.exe
+            out/make/**/*.nupkg
+            out/make/**/RELEASES
+          if-no-files-found: error
+          retention-days: 30
+
+  # ============================================================================
+  # Publish job - only runs on main branch after successful builds
+  # ============================================================================
+  publish:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    # Only publish on main branch pushes (not PRs)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display artifact structure
+        run: ls -laR artifacts/
+
+      - name: Get package version
+        id: package-version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Package version: $VERSION"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.package-version.outputs.version }}
+          name: Release v${{ steps.package-version.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
+            artifacts/**/*.zip
+            artifacts/**/*.dmg
+            artifacts/**/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================================================
+  # Cleanup job - removes old artifacts to save storage
+  # ============================================================================
+  cleanup:
+    name: Cleanup old artifacts
+    needs: publish
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Delete old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 30
+          keep_minimum_runs: 5
