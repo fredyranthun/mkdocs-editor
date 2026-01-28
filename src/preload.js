@@ -110,6 +110,25 @@ const api = {
     getLogs: () => ipcRenderer.invoke("preview:getLogs"),
 
     /**
+     * Clears preview logs
+     * @returns {Promise<void>}
+     */
+    clearLogs: () => ipcRenderer.invoke("preview:clearLogs"),
+
+    /**
+     * Gets the preview URL for a specific markdown file
+     * @param {string} relativePath - Path relative to docs directory
+     * @returns {Promise<string|null>}
+     */
+    getPageUrl: (relativePath) => ipcRenderer.invoke("preview:getPageUrl", relativePath),
+
+    /**
+     * Checks if the preview server is healthy
+     * @returns {Promise<boolean>}
+     */
+    isHealthy: () => ipcRenderer.invoke("preview:isHealthy"),
+
+    /**
      * Checks if MkDocs is installed and available
      * @returns {Promise<{available: boolean, path?: string, version?: string, error?: string}>}
      */

@@ -262,7 +262,7 @@ export const codeBlockInputRule = $inputRule(
 export const insertCodeBlockCommand = $command("insertCodeBlock", (ctx) => {
   return (attrs = {}) =>
     (state, dispatch) => {
-      const nodeType = ctx.get("code_block_enhanced").type(ctx);
+      const nodeType = codeBlockEnhancedNode.type(ctx);
 
       if (dispatch) {
         const node = nodeType.create({

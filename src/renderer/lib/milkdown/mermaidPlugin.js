@@ -188,7 +188,7 @@ export const mermaidInputRule = $inputRule(
 export const insertMermaidCommand = $command("insertMermaid", (ctx) => {
   return (templateType = "flowchart") =>
     (state, dispatch) => {
-      const nodeType = ctx.get("mermaid").type(ctx);
+      const nodeType = mermaidNode.type(ctx);
       const template = MERMAID_TEMPLATES[templateType]?.template || MERMAID_TEMPLATES.flowchart.template;
 
       if (dispatch) {
@@ -209,7 +209,7 @@ export const updateMermaidCommand = $command("updateMermaid", (ctx) => {
 
     if (node?.type.name === "mermaid") {
       if (dispatch) {
-        const nodeType = ctx.get("mermaid").type(ctx);
+        const nodeType = mermaidNode.type(ctx);
         const newNode = nodeType.create({ value: newCode }, newCode ? state.schema.text(newCode) : undefined);
         dispatch(state.tr.replaceWith(selection.from, selection.from + node.nodeSize, newNode));
       }

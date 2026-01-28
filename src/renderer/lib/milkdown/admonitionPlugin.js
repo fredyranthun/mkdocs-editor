@@ -170,7 +170,7 @@ export const admonitionInputRule = $inputRule(
 export const insertAdmonitionCommand = $command("insertAdmonition", (ctx) => {
   return (attrs = { type: "note", title: "", collapsible: false }) =>
     (state, dispatch) => {
-      const nodeType = ctx.get("admonition").type(ctx);
+      const nodeType = admonitionNode.type(ctx);
       const paragraphType = state.schema.nodes.paragraph;
 
       if (dispatch) {

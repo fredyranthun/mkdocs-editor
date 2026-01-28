@@ -14,44 +14,27 @@ export function EditorPane({ filePath, content, isModified, onChange, projectCon
   // Reference to editor for command execution
   const editorRef = useRef(null);
 
-  // Insert handlers - these append content at cursor or end
-  const handleInsertAdmonition = useCallback(
-    (selection) => {
-      const type = selection?.type || "note";
-      const admonitionMarkdown = `\n!!! ${type} ""\n    \n\n`;
-      // For now, append to content (proper cursor insertion requires editor API)
-      onChange(content + admonitionMarkdown);
-    },
-    [content, onChange],
-  );
+  // Insert handlers - use Milkdown commands via ref
+  const handleInsertAdmonition = useCallback((selection) => {
+    const type = selection?.type || "note";
+    if (editorRef.current?.isReady()) {
+      editorRef.current.insertAdmonition({ type, title: "" });
+    }
+  }, []);
 
-  const handleInsertMermaid = useCallback(
-    (selection) => {
-      const template = selection?.template || "flowchart";
-      const templates = {
-        flowchart: "graph TD\n    A[Start] --> B[End]",
-        sequence: "sequenceDiagram\n    Alice->>Bob: Hello",
-        classDiagram: "classDiagram\n    class Animal",
-        stateDiagram: "stateDiagram-v2\n    [*] --> State1",
-        erDiagram: "erDiagram\n    CUSTOMER ||--o{ ORDER : places",
-        gantt: "gantt\n    title Schedule\n    Task 1 :a1, 2024-01-01, 30d",
-        pie: 'pie title Distribution\n    "A" : 40\n    "B" : 60',
-        mindmap: "mindmap\n  root((Topic))\n    Branch 1\n    Branch 2",
-      };
-      const mermaidMarkdown = `\n\`\`\`mermaid\n${templates[template] || templates.flowchart}\n\`\`\`\n\n`;
-      onChange(content + mermaidMarkdown);
-    },
-    [content, onChange],
-  );
+  const handleInsertMermaid = useCallback((selection) => {
+    const templateKey = selection?.template || "flowchart";
+    if (editorRef.current?.isReady()) {
+      editorRef.current.insertMermaid({ template: templateKey });
+    }
+  }, []);
 
-  const handleInsertCodeBlock = useCallback(
-    (selection) => {
-      const language = selection?.language || "";
-      const codeMarkdown = `\n\`\`\`${language}\n\n\`\`\`\n\n`;
-      onChange(content + codeMarkdown);
-    },
-    [content, onChange],
-  );
+  const handleInsertCodeBlock = useCallback((selection) => {
+    const language = selection?.language || "";
+    if (editorRef.current?.isReady()) {
+      editorRef.current.insertCodeBlock({ language });
+    }
+  }, []);
 
   // Show placeholder if no file selected
   if (!filePath) {

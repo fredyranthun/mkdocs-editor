@@ -100,6 +100,80 @@ describe("MkDocsPreviewService", () => {
 
       expect(logs.length).toBe(1);
       expect(logs[0]).toContain("Test log message");
+
+      service.destroy();
+    });
+
+    it("should clear logs", () => {
+      const service = new PreviewService("/some/project");
+
+      service._addLog("Log 1");
+      service._addLog("Log 2");
+      expect(service.getLogs().length).toBe(2);
+
+      service.clearLogs();
+      expect(service.getLogs().length).toBe(0);
+
+      service.destroy();
+    });
+
+    it("should emit logsCleared event when clearing logs", () => {
+      const service = new PreviewService("/some/project");
+      let cleared = false;
+
+      service.on("logsCleared", () => {
+        cleared = true;
+      });
+
+      service.clearLogs();
+      expect(cleared).toBe(true);
+
+      service.destroy();
+    });
+
+    it("should return null for getPageUrl when not running", () => {
+      const service = new PreviewService("/some/project");
+      expect(service.getPageUrl("index.md")).toBeNull();
+      service.destroy();
+    });
+
+    it("should generate correct page URLs when running", () => {
+      const service = new PreviewService("/some/project");
+
+      // Simulate running state
+      service.state = {
+        status: "running",
+        url: "http://127.0.0.1:8000",
+        port: 8000,
+        error: null,
+      };
+
+      // Test various path conversions
+      expect(service.getPageUrl("index.md")).toBe("http://127.0.0.1:8000/");
+      expect(service.getPageUrl("getting-started/installation.md")).toBe(
+        "http://127.0.0.1:8000/getting-started/installation/",
+      );
+      expect(service.getPageUrl("reference/api.md")).toBe("http://127.0.0.1:8000/reference/api/");
+
+      service.destroy();
+    });
+
+    it("should return false for isHealthy when not running", async () => {
+      const service = new PreviewService("/some/project");
+      const healthy = await service.isHealthy();
+      expect(healthy).toBe(false);
+      service.destroy();
+    });
+
+    it("should properly cleanup on destroy", () => {
+      const service = new PreviewService("/some/project");
+      const eventCount = service.listenerCount("status");
+
+      service.on("status", () => {});
+      expect(service.listenerCount("status")).toBe(eventCount + 1);
+
+      service.destroy();
+      expect(service.listenerCount("status")).toBe(0);
     });
 
     // Note: Integration tests for start/stop would require mkdocs to be installed

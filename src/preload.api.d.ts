@@ -152,6 +152,21 @@ export interface PreloadAPI {
     getLogs(): Promise<string[]>;
 
     /**
+     * Clears preview logs
+     */
+    clearLogs(): Promise<void>;
+
+    /**
+     * Gets the preview URL for a specific markdown file
+     */
+    getPageUrl(relativePath: string): Promise<string | null>;
+
+    /**
+     * Checks if the preview server is healthy
+     */
+    isHealthy(): Promise<boolean>;
+
+    /**
      * Subscribes to status changes
      * @returns Unsubscribe function
      */

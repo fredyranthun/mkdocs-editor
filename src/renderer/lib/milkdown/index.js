@@ -7,7 +7,12 @@
  * - Enhanced code blocks with language selector
  */
 
-export { admonitionPlugin, admonitionNode, ADMONITION_TYPES } from "./admonitionPlugin.js";
-export { mermaidPlugin, mermaidNode, MERMAID_TEMPLATES } from "./mermaidPlugin.js";
-export { codeBlockEnhancedPlugin, codeBlockEnhancedNode, COMMON_LANGUAGES } from "./codeBlockPlugin.js";
+export { admonitionPlugin, admonitionNode, ADMONITION_TYPES, insertAdmonitionCommand } from "./admonitionPlugin.js";
+export { mermaidPlugin, mermaidNode, MERMAID_TEMPLATES, insertMermaidCommand } from "./mermaidPlugin.js";
+export {
+  codeBlockEnhancedPlugin,
+  codeBlockEnhancedNode,
+  COMMON_LANGUAGES,
+  insertCodeBlockCommand,
+} from "./codeBlockPlugin.js";
 export { materialBlocksPlugin } from "./materialBlocksPlugin.js";

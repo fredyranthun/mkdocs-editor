@@ -53,15 +53,26 @@ function getEnhancedPath() {
  * @param {string} signal - Signal to send
  */
 function killProcessTree(pid, signal = "SIGTERM") {
-  try {
-    // On Unix, use negative PID to kill process group
-    process.kill(-pid, signal);
-  } catch (err) {
-    // Fallback: try to kill just the process
+  if (process.platform === "win32") {
+    // On Windows, use taskkill to kill the process tree
     try {
-      process.kill(pid, signal);
+      require("child_process").execSync(`taskkill /pid ${pid} /T /F`, {
+        stdio: "ignore",
+      });
     } catch {
-      // Process already dead
+      // Process already dead or access denied
+    }
+  } else {
+    // On Unix, use negative PID to kill process group
+    try {
+      process.kill(-pid, signal);
+    } catch (err) {
+      // Fallback: try to kill just the process
+      try {
+        process.kill(pid, signal);
+      } catch {
+        // Process already dead
+      }
     }
   }
 }
@@ -201,6 +212,38 @@ export class PreviewService extends EventEmitter {
       error: null,
     };
     this.logs = [];
+    this._cleanupBound = this._cleanup.bind(this);
+
+    // Register cleanup handlers for graceful shutdown
+    process.on("exit", this._cleanupBound);
+    process.on("SIGINT", this._cleanupBound);
+    process.on("SIGTERM", this._cleanupBound);
+  }
+
+  /**
+   * Cleanup handler for graceful shutdown
+   * @private
+   */
+  _cleanup() {
+    if (this.process) {
+      try {
+        killProcessTree(this.process.pid, "SIGKILL");
+      } catch {
+        // Ignore errors during cleanup
+      }
+      this.process = null;
+    }
+  }
+
+  /**
+   * Removes process event listeners (call when destroying the service)
+   */
+  destroy() {
+    process.off("exit", this._cleanupBound);
+    process.off("SIGINT", this._cleanupBound);
+    process.off("SIGTERM", this._cleanupBound);
+    this._cleanup();
+    this.removeAllListeners();
   }
 
   /**
@@ -217,6 +260,46 @@ export class PreviewService extends EventEmitter {
    */
   getLogs() {
     return [...this.logs];
+  }
+
+  /**
+   * Clears collected logs
+   */
+  clearLogs() {
+    this.logs = [];
+    this.emit("logsCleared");
+  }
+
+  /**
+   * Gets the preview URL for a specific markdown file path
+   * @param {string} relativePath - Path relative to docs directory (e.g., 'getting-started/installation.md')
+   * @returns {string|null} - Full URL to the page in preview, or null if not running
+   */
+  getPageUrl(relativePath) {
+    if (this.state.status !== "running" || !this.state.url) {
+      return null;
+    }
+
+    // Convert .md path to URL path
+    // e.g., 'getting-started/installation.md' -> 'getting-started/installation/'
+    // e.g., 'index.md' -> ''
+    let urlPath = relativePath.replace(/\.md$/i, "/").replace(/index\/$/, "");
+
+    // Ensure no double slashes and proper formatting
+    urlPath = urlPath.replace(/\/+/g, "/").replace(/^\//, "");
+
+    return `${this.state.url}/${urlPath}`.replace(/\/+$/, "/");
+  }
+
+  /**
+   * Checks if the preview server is healthy
+   * @returns {Promise<boolean>}
+   */
+  async isHealthy() {
+    if (this.state.status !== "running" || !this.state.url) {
+      return false;
+    }
+    return healthCheck(this.state.url);
   }
 
   /**

@@ -136,6 +136,26 @@ function setupIpcHandlers() {
     return previewService.getLogs();
   });
 
+  ipcMain.handle("preview:clearLogs", () => {
+    if (previewService) {
+      previewService.clearLogs();
+    }
+  });
+
+  ipcMain.handle("preview:getPageUrl", (_event, relativePath) => {
+    if (!previewService) {
+      return null;
+    }
+    return previewService.getPageUrl(relativePath);
+  });
+
+  ipcMain.handle("preview:isHealthy", async () => {
+    if (!previewService) {
+      return false;
+    }
+    return previewService.isHealthy();
+  });
+
   ipcMain.handle("preview:checkMkDocs", () => {
     return checkMkDocsAvailability();
   });
@@ -249,7 +269,7 @@ async function handleProjectLoad(projectPath) {
 async function handleProjectClose() {
   if (previewService) {
     await previewService.stop();
-    previewService.removeAllListeners();
+    previewService.destroy();
     previewService = null;
   }
   if (pythonEnvService) {

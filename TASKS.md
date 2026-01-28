@@ -51,7 +51,7 @@
     - pip install mkdocs-material
   - Detect existing requirements.txt/poetry and prefer project env if available
 
-- T12 Spawn mkdocs serve (main)
+- [x] T12 Spawn mkdocs serve (main)
   - Find free port
   - Start mkdocs serve in project root
   - Capture stdout/stderr logs

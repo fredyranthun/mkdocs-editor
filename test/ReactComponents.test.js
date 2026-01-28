@@ -84,7 +84,8 @@ describe("Component Module Structure", () => {
     it("should export MilkdownEditor component", async () => {
       const { MilkdownEditor } = await import("../src/renderer/components/MilkdownEditor.jsx");
       expect(MilkdownEditor).toBeDefined();
-      expect(typeof MilkdownEditor).toBe("function");
+      // forwardRef components are objects with a $$typeof symbol, not plain functions
+      expect(typeof MilkdownEditor).toMatch(/function|object/);
     });
   });
 
