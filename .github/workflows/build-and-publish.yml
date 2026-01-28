@@ -18,7 +18,7 @@ env:
 
 jobs:
   # ============================================================================
-  # Build job - runs on all three platforms in parallel
+  # Build job - runs on Linux and macOS in parallel
   # ============================================================================
   build:
     name: Build (${{ matrix.os }})
@@ -35,10 +35,6 @@ jobs:
           - os: macos-latest
             platform: darwin
             artifact-name: macos-builds
-          # Windows build
-          - os: windows-latest
-            platform: win32
-            artifact-name: windows-builds
 
     steps:
       - name: Checkout repository
@@ -94,27 +90,6 @@ jobs:
           fi
 
       # ========================================================================
-      # Windows-specific setup
-      # ========================================================================
-      - name: Setup Windows code signing
-        if: matrix.platform == 'win32'
-        env:
-          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-        run: |
-          if ($env:WINDOWS_CERTIFICATE) {
-            echo "Setting up Windows code signing..."
-            $certBytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
-            $certPath = "$env:RUNNER_TEMP\certificate.pfx"
-            [IO.File]::WriteAllBytes($certPath, $certBytes)
-            echo "WINDOWS_CERT_PATH=$certPath" >> $env:GITHUB_ENV
-            echo "Code signing certificate configured"
-          } else {
-            echo "No code signing certificate provided, skipping..."
-          }
-        shell: pwsh
-
-      # ========================================================================
       # Build steps (common to all platforms)
       # ========================================================================
       - name: Install dependencies
@@ -131,8 +106,6 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # Windows signing
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: npm run make -- --platform=${{ matrix.platform }}
 
       # ========================================================================
@@ -147,9 +120,6 @@ jobs:
             out/make/**/*.rpm
             out/make/**/*.zip
             out/make/**/*.dmg
-            out/make/**/*.exe
-            out/make/**/*.nupkg
-            out/make/**/RELEASES
           if-no-files-found: error
           retention-days: 30
 
@@ -195,7 +165,6 @@ jobs:
             artifacts/**/*.rpm
             artifacts/**/*.zip
             artifacts/**/*.dmg
-            artifacts/**/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
