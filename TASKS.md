@@ -57,7 +57,7 @@
   - Capture stdout/stderr logs
   - Stop process on project close/app exit
 
-- T13 Embed preview in app (renderer + main coordination)
+- [x] T13 Embed preview in app (renderer + main coordination)
   - Panel loads http://127.0.0.1:PORT
   - Health-check and retry if startup is slow
   - MVP: allow `<webview>` restricted to localhost **or** implement `BrowserView`

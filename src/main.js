@@ -291,6 +291,7 @@ const createWindow = () => {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false, // Required for preload to work with ESM
+      webviewTag: true, // Enable webview tag for preview pane
     },
   });
 
@@ -309,7 +310,46 @@ const createWindow = () => {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+
+  // Add security restrictions for webview content
+  mainWindow.webContents.on("will-attach-webview", (event, webPreferences, params) => {
+    // Strip away preload scripts if not needed
+    delete webPreferences.preload;
+    delete webPreferences.preloadURL;
+
+    // Disable Node.js integration
+    webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInWorker = false;
+    webPreferences.contextIsolation = true;
+
+    // Restrict webview to localhost URLs only
+    const srcUrl = params.src;
+    if (!isLocalhostUrl(srcUrl)) {
+      console.warn("[Webview] Blocked non-localhost URL:", srcUrl);
+      event.preventDefault();
+    }
+  });
 };
+
+/**
+ * Check if a URL is a localhost URL (for webview security)
+ * @param {string} url
+ * @returns {boolean}
+ */
+function isLocalhostUrl(url) {
+  if (!url || url === "about:blank") return true;
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.hostname === "localhost" ||
+      parsed.hostname === "127.0.0.1" ||
+      parsed.hostname === "::1" ||
+      parsed.hostname.endsWith(".localhost")
+    );
+  } catch {
+    return false;
+  }
+}
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

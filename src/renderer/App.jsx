@@ -227,6 +227,7 @@ export function App() {
 
         <PreviewPane
           status={previewStatus}
+          currentFile={currentFile}
           onStart={handleStartPreview}
           onStop={handleStopPreview}
           onRefresh={handleRefreshPreview}

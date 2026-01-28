@@ -359,12 +359,55 @@ body {
   flex: 1;
   overflow: hidden;
   background-color: #ffffff;
+  position: relative;
 }
 
 .preview-iframe {
   width: 100%;
   height: 100%;
   border: none;
+}
+
+.preview-webview {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background-color: #ffffff;
+}
+
+.preview-loading-overlay,
+.preview-error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background-color: rgba(30, 30, 30, 0.9);
+  color: var(--text-secondary);
+  z-index: 10;
+}
+
+.preview-error-overlay {
+  background-color: rgba(30, 30, 30, 0.95);
+}
+
+.preview-loading-overlay .spinner {
+  font-size: 32px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .preview-message {
@@ -376,6 +419,11 @@ body {
   gap: 12px;
   color: var(--text-secondary);
   background-color: var(--bg-primary);
+}
+
+.preview-message .hint {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .preview-message.error {
