@@ -13,6 +13,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Required permissions for creating releases
+permissions:
+  contents: write
+  actions: write
+
 env:
   NODE_VERSION: "20"
 
